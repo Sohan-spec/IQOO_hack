@@ -38,6 +38,8 @@ class Runtime:
         self.sender = sender or ConfirmationSender()
         self.default_callback_url = default_callback_url
         self.expiry = timedelta(seconds=expiry_seconds)
+        # R5: live interruption filter reported by native (None until reported).
+        self.interruption_filter: int | None = None
 
     async def enqueue(
         self,
@@ -165,6 +167,7 @@ class Runtime:
             "recent_matches": [self._recent_match_dict(event) for event in self.events.matches],
             "default_callback_url": self.default_callback_url,
             "server": {"bind": "0.0.0.0:8787"},
+            "interruption_filter": self.interruption_filter,
         }
 
     def _recent_match_dict(self, event: MatchEvent) -> dict:

@@ -33,6 +33,8 @@ def test_snapshot_route_on_loopback() -> None:
         assert "recent_credits" in body
         assert "recent_raw_notifications" in body
         assert isinstance(body["recent_raw_notifications"], list)
+        assert "interruption_filter" in body
+        assert body["interruption_filter"] is None
         payload = json.dumps(
             {
                 "session_id": "sess-http",
@@ -116,6 +118,18 @@ def test_settings_default_callback_then_enqueue_omits_url() -> None:
 
         snap = _wait_snapshot()
         assert snap["default_callback_url"] == default_url
+        assert "interruption_filter" in snap
+        assert snap["interruption_filter"] is None
+
+        dnd_status, dnd_body = _post(
+            "http://127.0.0.1:8787/v1/internal/settings",
+            {"interruption_filter": 3},
+        )
+        assert dnd_status == 200
+        assert dnd_body["interruption_filter"] == 3
+        snap = _wait_snapshot()
+        assert snap["interruption_filter"] == 3
+        assert snap["default_callback_url"] == default_url
 
         created, public = _post("http://127.0.0.1:8787/v1/transactions", omit_body)
         assert created == 201
@@ -160,3 +174,86 @@ def test_oversized_body_is_rejected() -> None:
             assert body.get("error") == "payload too large"
     finally:
         stop()
+
+
+
+def test_is_loopback_client() -> None:
+    from app.main import is_loopback_client
+
+    assert is_loopback_client("127.0.0.1")
+    assert is_loopback_client("::1")
+    assert is_loopback_client("localhost")
+    assert is_loopback_client("::ffff:127.0.0.1")
+    assert not is_loopback_client("192.168.43.12")
+    assert not is_loopback_client("10.0.0.2")
+
+
+def test_enqueue_rejects_file_callback_url_over_http() -> None:
+    runtime = Runtime()
+    thread = threading.Thread(target=lambda: start(runtime), daemon=True)
+    thread.start()
+    try:
+        _wait_snapshot()
+        status, err = _post(
+            "http://127.0.0.1:8787/v1/transactions",
+            {
+                "session_id": "sess-file",
+                "customer_name": "Priya",
+                "amount": "10.00",
+                "callback_url": "file:///etc/passwd",
+            },
+        )
+        assert status == 400
+        assert "callback_url" in err.get("error", "")
+    finally:
+        stop()
+
+
+def test_manual_confirm_url_decodes_session_id() -> None:
+    runtime = Runtime()
+    thread = threading.Thread(target=lambda: start(runtime), daemon=True)
+    thread.start()
+    try:
+        _wait_snapshot()
+        session_id = "sess space"
+        status, public = _post(
+            "http://127.0.0.1:8787/v1/transactions",
+            {
+                "session_id": session_id,
+                "customer_name": "Priya",
+                "amount": "10.00",
+                "callback_url": "http://127.0.0.1:9/confirm",
+            },
+        )
+        assert status == 201
+        confirm_status, body = _post(
+            "http://127.0.0.1:8787/v1/internal/transactions/sess%20space/confirm",
+            {},
+        )
+        assert confirm_status == 200
+        assert body["session_id"] == session_id
+        assert body["status"] == "confirmed"
+    finally:
+        stop()
+
+
+def test_ingest_rejects_invalid_posted_at() -> None:
+    runtime = Runtime()
+    thread = threading.Thread(target=lambda: start(runtime), daemon=True)
+    thread.start()
+    try:
+        _wait_snapshot()
+        status, err = _post(
+            "http://127.0.0.1:8787/v1/internal/notifications",
+            {
+                "package": "com.phonepe.app",
+                "title": "Payment received",
+                "text": "You have received Rs. 10.00 from PRIYA",
+                "posted_at": "not-iso",
+            },
+        )
+        assert status == 400
+        assert "posted_at" in err.get("error", "")
+    finally:
+        stop()
+

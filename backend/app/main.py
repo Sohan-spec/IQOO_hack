@@ -8,7 +8,7 @@ import logging
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from app.api import internal, storefront
 from app.api.storefront import ApiError
@@ -16,6 +16,19 @@ from app.config import BIND_HOST, MAX_HTTP_BODY_BYTES, PORT, SWEEP_INTERVAL_SECO
 from app.runtime import Runtime
 
 logger = logging.getLogger(__name__)
+
+
+class _RelayHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+
+
+def is_loopback_client(host: str) -> bool:
+    """True when the HTTP peer is this device (Flutter / NotificationListener)."""
+    value = (host or "").strip().lower()
+    if value.startswith("::ffff:"):
+        value = value[7:]
+    return value in {"127.0.0.1", "::1", "localhost"}
+
 
 _runtime: Runtime | None = None
 _loop: asyncio.AbstractEventLoop | None = None
@@ -39,6 +52,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: Any) -> None:
         return
+
+    def _require_loopback(self) -> None:
+        host = self.client_address[0] if self.client_address else ""
+        if not is_loopback_client(host):
+            raise ApiError(403, "internal routes are loopback-only")
 
     def _cors(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -84,6 +102,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         try:
+            if path.startswith("/v1/internal/"):
+                self._require_loopback()
             if path == "/v1/internal/snapshot":
                 status, body = _call(internal.snapshot(get_runtime()))
                 self._send(status, body)
@@ -98,6 +118,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         try:
+            if path.startswith("/v1/internal/"):
+                self._require_loopback()
             body = self._read_json()
             runtime = get_runtime()
             if path == "/v1/transactions":
@@ -115,7 +137,7 @@ class Handler(BaseHTTPRequestHandler):
             prefix = "/v1/internal/transactions/"
             suffix = "/confirm"
             if path.startswith(prefix) and path.endswith(suffix):
-                session_id = path[len(prefix) : -len(suffix)]
+                session_id = unquote(path[len(prefix) : -len(suffix)])
                 status, payload = _call(internal.manual_confirm(runtime, session_id))
                 self._send(status, payload)
                 return
@@ -144,25 +166,32 @@ def start(runtime: Runtime | None = None) -> None:
     thread = threading.Thread(target=_loop.run_forever, name="relay-asyncio", daemon=True)
     thread.start()
     asyncio.run_coroutine_threadsafe(_sweeper(_runtime), _loop)
-    _http = ThreadingHTTPServer((BIND_HOST, PORT), Handler)
+    _http = _RelayHTTPServer((BIND_HOST, PORT), Handler)
     _http.serve_forever()
 
 
 def stop() -> None:
-    global _http, _loop, _running
+    global _http, _loop, _running, _runtime
     _running = False
     if _http is not None:
-        _http.shutdown()
+        http = _http
         _http = None
+        http.shutdown()
+        http.server_close()
     if _loop is not None:
         loop = _loop
+        _loop = None
 
         def _halt() -> None:
             for task in asyncio.all_tasks(loop):
                 task.cancel()
             loop.stop()
 
-        _loop.call_soon_threadsafe(_halt)
+        try:
+            loop.call_soon_threadsafe(_halt)
+        except RuntimeError:
+            pass
+    _runtime = None
 
 
 if __name__ == "__main__":

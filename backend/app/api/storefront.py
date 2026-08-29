@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.confirm import is_callback_url
 from app.models import parse_amount
 from app.runtime import Runtime
 
@@ -28,6 +29,8 @@ async def enqueue(runtime: Runtime, body: dict) -> tuple[int, dict]:
         callback_url = callback_url.strip()
     else:
         callback_url = ""
+    if callback_url and not is_callback_url(callback_url):
+        raise ApiError(400, "callback_url must start with http:// or https://")
     if not callback_url and not runtime.default_callback_url:
         raise ApiError(400, "callback_url is required")
     try:

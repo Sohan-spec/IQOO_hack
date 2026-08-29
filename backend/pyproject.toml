@@ -1,2 +1,5 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# Host-installed pytest11 plugins (web3/pytest_ethereum, langsmith) crash on
+# import in this environment. Product tests are stdlib-only.
+addopts = ["-p", "no:web3", "-p", "no:pytest_ethereum", "-p", "no:langsmith_plugin"]

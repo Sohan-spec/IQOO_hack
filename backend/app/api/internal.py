@@ -12,16 +12,25 @@ async def snapshot(runtime: Runtime) -> tuple[int, dict]:
 async def update_settings(runtime: Runtime, body: dict) -> tuple[int, dict]:
     if not isinstance(body, dict):
         raise ApiError(400, "JSON object required")
-    if "default_callback_url" not in body:
-        raise ApiError(400, "default_callback_url is required")
-    value = body.get("default_callback_url")
-    if not isinstance(value, str):
-        raise ApiError(400, "default_callback_url must be a string")
-    url = value.strip()
-    if url and not is_callback_url(url):
-        raise ApiError(400, "default_callback_url must start with http:// or https://")
-    runtime.default_callback_url = url
-    return 200, {"default_callback_url": runtime.default_callback_url}
+    if "default_callback_url" not in body and "interruption_filter" not in body:
+        raise ApiError(400, "default_callback_url or interruption_filter is required")
+    if "default_callback_url" in body:
+        value = body.get("default_callback_url")
+        if not isinstance(value, str):
+            raise ApiError(400, "default_callback_url must be a string")
+        url = value.strip()
+        if url and not is_callback_url(url):
+            raise ApiError(400, "default_callback_url must start with http:// or https://")
+        runtime.default_callback_url = url
+    if "interruption_filter" in body:
+        filt = body.get("interruption_filter")
+        if filt is not None and not isinstance(filt, int):
+            raise ApiError(400, "interruption_filter must be an integer or null")
+        runtime.interruption_filter = filt
+    return 200, {
+        "default_callback_url": runtime.default_callback_url,
+        "interruption_filter": runtime.interruption_filter,
+    }
 
 
 async def ingest_notification(runtime: Runtime, body: dict) -> tuple[int, dict]:
@@ -35,7 +44,10 @@ async def ingest_notification(runtime: Runtime, body: dict) -> tuple[int, dict]:
     posted_at = body.get("posted_at")
     if posted_at is not None and not isinstance(posted_at, str):
         raise ApiError(400, "posted_at must be a string")
-    credit = await runtime.ingest_notification(package, title, text, posted_at)
+    try:
+        credit = await runtime.ingest_notification(package, title, text, posted_at)
+    except ValueError as exc:
+        raise ApiError(400, str(exc)) from exc
     if credit is None:
         return 200, {"accepted": True, "credit": False}
     return 200, {"accepted": True, "credit": True, "event": credit.to_public_dict()}

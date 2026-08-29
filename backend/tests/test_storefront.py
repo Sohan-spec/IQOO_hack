@@ -106,3 +106,29 @@ def test_enqueue_without_callback_url_uses_operator_default() -> None:
         assert entry.callback_url == "http://storefront.example/confirm"
 
     asyncio.run(_run())
+
+
+
+def test_enqueue_rejects_non_http_callback_url() -> None:
+    async def _run() -> None:
+        from app.api.storefront import ApiError
+        from app.runtime import Runtime
+
+        runtime = Runtime()
+        try:
+            await enqueue(
+                runtime,
+                {
+                    "session_id": "s-file",
+                    "customer_name": "Priya",
+                    "amount": "10.00",
+                    "callback_url": "file:///etc/passwd",
+                },
+            )
+            raise AssertionError("expected ApiError")
+        except ApiError as exc:
+            assert exc.status == 400
+            assert "callback_url" in exc.message
+
+    asyncio.run(_run())
+
