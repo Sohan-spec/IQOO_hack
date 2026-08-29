@@ -1,0 +1,2 @@
+# No third-party packages on the device. Change 1 fell back to stdlib http.server + json.
+# Host tests: pip install pytest

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "credit_rs",
+    "title": "Payment received",
+    "text": "You have received Rs. 150.00 from PRIYA SHARMA",
+    "expect_credit": true,
+    "amount": "150.00",
+    "name": "PRIYA SHARMA"
+  },
+  {
+    "id": "credit_rupee",
+    "title": "Received payment",
+    "text": "You have received ₹1.00 from JOHN DOE",
+    "expect_credit": true,
+    "amount": "1.00",
+    "name": "JOHN DOE"
+  },
+  {
+    "id": "credit_commas",
+    "title": "Payment received",
+    "text": "You have received Rs. 1,250.50 from A KUMAR",
+    "expect_credit": true,
+    "amount": "1250.50",
+    "name": "A KUMAR"
+  },
+  {
+    "id": "debit_paid",
+    "title": "Payment successful",
+    "text": "You paid Rs. 150.00 to RELAY STORE",
+    "expect_credit": false
+  },
+  {
+    "id": "promo",
+    "title": "PhonePe",
+    "text": "Get 10% cashback on your next payment",
+    "expect_credit": false
+  },
+  {
+    "id": "chatter",
+    "title": "PhonePe",
+    "text": "Your monthly statement is ready",
+    "expect_credit": false
+  }
+]
