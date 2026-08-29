@@ -39,14 +39,10 @@
         <service
             android:name=".RelayNotificationListener"
             android:exported="true"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:foregroundServiceType="specialUse">
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService"/>
             </intent-filter>
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Reads PhonePe credit notifications so Relay can match them to pending checkouts."/>
         </service>
         <meta-data
             android:name="flutterEmbedding"
