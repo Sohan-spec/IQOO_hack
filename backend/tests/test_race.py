@@ -45,6 +45,7 @@ async def _race() -> None:
 
     winners = [result for result in (auto_result, manual_result) if result is not None]
     assert len(winners) == 1
+    runtime.sender.wait_idle(timeout=2)
     assert len(sent) == 1
     entry = runtime.queue.get_unlocked("s1")
     assert entry is not None

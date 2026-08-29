@@ -5,7 +5,7 @@ Relay's wake lock, foreground service, and the Android "ignore battery optimizat
 ## Must do in-app (first launch)
 
 1. Allow **notifications** (`POST_NOTIFICATIONS`) when Android asks.
-2. **Notification access** — operator UI is red until granted. Tap it, enable Relay Owner. Required before any live PhonePe test.
+2. **Notification access** — the operator screen is blocked until this is granted. Tap the prompt, enable Relay Owner. Required before any live PhonePe test.
 3. **Ignore battery optimizations** — system dialog: Allow Relay Owner to ignore battery optimizations. This is the same setup pass as notification access; grant it before the demo, not during a live pay.
 
 ## Must do in iQOO settings (no API)
@@ -30,6 +30,8 @@ Wording varies slightly by OriginOS / Funtouch version. Look under **Settings**,
 ## After reboot
 
 Open Relay Owner once so the foreground service and Python listener start. Confirm the persistent notification "Relay is verifying payments" is visible, then you may turn the screen off.
+
+The intended code path does not require a tap (process start runs Application.onCreate), but this is unverified on this handset as of 2026-08-29.
 
 ## Confirm screen-off still serves HTTP
 

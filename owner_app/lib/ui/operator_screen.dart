@@ -20,19 +20,23 @@ class OperatorScreen extends StatefulWidget {
 class _OperatorScreenState extends State<OperatorScreen> {
   final _python = PythonClient();
   final _device = DeviceBridge();
+  final _callbackController = TextEditingController();
   Timer? _poll;
   Snapshot? _snapshot;
   bool _access = false;
   bool _batteryOk = false;
+  bool _callbackPushed = false;
   int _filter = 0;
   List<String> _lan = [];
   String? _error;
+  String? _callbackError;
 
   @override
   void initState() {
     super.initState();
     _device.requestPostNotifications();
     _device.runSetupPrompts();
+    _pushDefaultCallbackUrl();
     _refresh();
     _poll = Timer.periodic(const Duration(milliseconds: 500), (_) => _refresh());
   }
@@ -40,25 +44,58 @@ class _OperatorScreenState extends State<OperatorScreen> {
   @override
   void dispose() {
     _poll?.cancel();
+    _callbackController.dispose();
     super.dispose();
   }
 
-  Future<void> _refresh() async {
+  Future<void> _pushDefaultCallbackUrl() async {
+    if (_callbackPushed) {
+      return;
+    }
     try {
-      final snapshot = await _python.snapshot();
-      final access = await _device.notificationAccessGranted();
+      final url = await _device.getDefaultCallbackUrl();
+      if (mounted) {
+        _callbackController.text = url;
+      }
+      await _python.setDefaultCallbackUrl(url);
+      _callbackPushed = true;
+    } catch (_) {
+      // Python may still be binding 8787; _refresh retries until it succeeds.
+    }
+  }
+
+  Future<void> _refresh() async {
+    var access = _access;
+    try {
+      access = await _device.notificationAccessGranted();
+    } catch (_) {
+      // Keep the last known value; fail closed on the initial false.
+    }
+    if (mounted) {
+      setState(() => _access = access);
+    }
+    try {
       final filter = await _device.interruptionFilter();
       final batteryOk = await _device.batteryOptimizationIgnored();
       final lan = await LanEndpoint.discover();
+      if (mounted) {
+        setState(() {
+          _filter = filter;
+          _batteryOk = batteryOk;
+          _lan = lan;
+        });
+      }
+    } catch (_) {
+      // Leave DND / battery / LAN rows on the last successful poll.
+    }
+    await _pushDefaultCallbackUrl();
+    try {
+      final snapshot = await _python.snapshot();
       if (!mounted) {
         return;
       }
       setState(() {
         _snapshot = snapshot;
-        _access = access;
-        _filter = filter;
-        _batteryOk = batteryOk;
-        _lan = lan;
         _error = null;
       });
     } catch (error) {
@@ -70,48 +107,101 @@ class _OperatorScreenState extends State<OperatorScreen> {
   }
 
   Future<void> _confirm(String sessionId) async {
-    await _python.manualConfirm(sessionId);
+    try {
+      await _python.manualConfirm(sessionId);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = error.toString());
+      }
+      return;
+    }
     await _refresh();
+  }
+
+  Future<void> _saveDefaultCallbackUrl() async {
+    final url = _callbackController.text.trim();
+    if (url.isNotEmpty && !url.startsWith('http://') && !url.startsWith('https://')) {
+      setState(() => _callbackError = 'Must start with http:// or https://');
+      return;
+    }
+    _callbackController.text = url;
+    setState(() => _callbackError = null);
+    try {
+      await _device.setDefaultCallbackUrl(url);
+      await _python.setDefaultCallbackUrl(url);
+      _callbackPushed = true;
+    } catch (error) {
+      _callbackPushed = false;
+      if (mounted) {
+        setState(() => _callbackError = error.toString());
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final snapshot = _snapshot;
     return Scaffold(
       appBar: AppBar(title: const Text('Relay owner')),
-      body: ListView(
-        children: [
-          if (_error != null)
-            ListTile(
-              title: const Text('Python backend unreachable'),
-              subtitle: Text(_error!),
-            ),
-          AccessStatus(
-            granted: _access,
-            onOpenSettings: _device.openNotificationAccessSettings,
-          ),
-          DndStatus(filter: _filter),
+      body: _access ? _operatorBody() : AccessGate(onOpenSettings: _device.openNotificationAccessSettings),
+    );
+  }
+
+  Widget _operatorBody() {
+    final snapshot = _snapshot;
+    return ListView(
+      children: [
+        if (_error != null)
           ListTile(
-            leading: Icon(
-              _batteryOk ? Icons.battery_charging_full : Icons.battery_alert,
-              color: _batteryOk ? const Color(0xFF3DDC97) : const Color(0xFFE8A838),
-            ),
-            title: Text(_batteryOk ? 'Battery optimization off' : 'Allow background run'),
-            subtitle: const Text(
-              'Screen can be off. On iQOO also: Autostart on, lock Relay in recents, do not swipe it away.',
-            ),
-            onTap: _batteryOk ? null : _device.requestIgnoreBatteryOptimizations,
+            title: const Text('Python backend unreachable'),
+            subtitle: Text(_error!),
           ),
-          LanEndpoint(urls: _lan),
-          MatchBanner(match: snapshot?.recentMatches.firstOrNull),
-          const Divider(),
-          const ListTile(title: Text('Pending')),
-          PendingList(pending: snapshot?.pending ?? [], onConfirm: _confirm),
-          const Divider(),
-          const ListTile(title: Text('Credit events')),
-          CreditFeed(credits: snapshot?.recentCredits ?? []),
-        ],
-      ),
+        const AccessStatus(),
+        DndStatus(filter: _filter),
+        ListTile(
+          leading: Icon(
+            _batteryOk ? Icons.battery_charging_full : Icons.battery_alert,
+            color: _batteryOk ? const Color(0xFF3DDC97) : const Color(0xFFE8A838),
+          ),
+          title: Text(_batteryOk ? 'Battery optimization off' : 'Allow background run'),
+          subtitle: const Text(
+            'Screen can be off. On iQOO also: Autostart on, lock Relay in recents, do not swipe it away.',
+          ),
+          onTap: _batteryOk ? null : _device.requestIgnoreBatteryOptimizations,
+        ),
+        LanEndpoint(urls: _lan),
+        ExpansionTile(
+          title: const Text('Default callback URL'),
+          subtitle: const Text('Used when the storefront omits callback_url'),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: TextField(
+                controller: _callbackController,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: 'http:// or https:// URL',
+                  errorText: _callbackError,
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _saveDefaultCallbackUrl,
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+        MatchBanner(match: snapshot?.recentMatches.firstOrNull),
+        const Divider(),
+        const ListTile(title: Text('Pending')),
+        PendingList(pending: snapshot?.pending ?? [], onConfirm: _confirm),
+        const Divider(),
+        const ListTile(title: Text('Credit events')),
+        CreditFeed(credits: snapshot?.recentCredits ?? []),
+      ],
     );
   }
 }

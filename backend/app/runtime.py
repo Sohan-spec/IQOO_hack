@@ -2,16 +2,27 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from app.config import DEFAULT_CALLBACK_URL, EXPIRY_SECONDS
 from app.confirm import ConfirmationSender
 from app.events import EventLog
 from app.matcher import select_candidate
-from app.models import CreditEvent, MatchEvent, PendingEntry, parse_amount, parse_iso, utcnow
+from app.models import (
+    CreditEvent,
+    MatchEvent,
+    PendingEntry,
+    RawNotification,
+    parse_amount,
+    parse_iso,
+    utcnow,
+)
 from app.parser import parse_credit
 from app.queue import TransactionQueue
 from app.state import PENDING, mark_confirmed
+
+logger = logging.getLogger(__name__)
 
 
 class Runtime:
@@ -53,11 +64,27 @@ class Runtime:
         text: str,
         posted_at=None,
     ) -> CreditEvent | None:
+        when = posted_at if hasattr(posted_at, "isoformat") else parse_iso(posted_at)
         parsed = parse_credit(title, text)
+        logger.info(
+            "ingest package=%s title=%s text=%s parsed=%s",
+            package,
+            title,
+            text,
+            parsed is not None,
+        )
+        self.events.add_raw_notification(
+            RawNotification(
+                package=package,
+                title=title,
+                text=text,
+                posted_at=when,
+                parsed=parsed is not None,
+            )
+        )
         if parsed is None:
             return None
         amount, payer_name = parsed
-        when = posted_at if hasattr(posted_at, "isoformat") else parse_iso(posted_at)
         credit = CreditEvent(
             package=package,
             title=title,
@@ -94,7 +121,7 @@ class Runtime:
                 source="matcher",
             )
         )
-        await self.sender.send(matched)
+        self.sender.submit(matched)
         return matched
 
     async def manual_confirm(self, session_id: str) -> PendingEntry | None:
@@ -115,7 +142,7 @@ class Runtime:
                 source="manual",
             )
         )
-        await self.sender.send(matched)
+        self.sender.submit(matched)
         return matched
 
     async def sweep_expired(self) -> None:
@@ -132,6 +159,23 @@ class Runtime:
         return {
             "pending": pending,
             "recent_credits": [event.to_public_dict() for event in self.events.credits],
-            "recent_matches": [event.to_public_dict() for event in self.events.matches],
+            "recent_raw_notifications": [
+                event.to_public_dict() for event in self.events.raw_notifications
+            ],
+            "recent_matches": [self._recent_match_dict(event) for event in self.events.matches],
+            "default_callback_url": self.default_callback_url,
             "server": {"bind": "0.0.0.0:8787"},
         }
+
+    def _recent_match_dict(self, event: MatchEvent) -> dict:
+        item = event.to_public_dict()
+        item["via"] = "auto" if event.source == "matcher" else "manual"
+        item["matched_at"] = item["at"]
+        live = self.queue.get_unlocked(event.session_id)
+        if live is not None:
+            item["status"] = live.status
+            item["confirm_acked"] = live.confirm_acked
+        else:
+            item.setdefault("status", "confirmed")
+            item.setdefault("confirm_acked", False)
+        return item

@@ -75,13 +75,15 @@ Chaquopy 17 installs with `--only-binary` and only ships native wheels listed at
 
 ## 2. Python backend structure
 
-**Framework: decided by Change 1.** Preferred: FastAPI + uvicorn + Pydantic. Fallback: stdlib `http.server` + `json`. Route layout and module responsibilities do not change with the stack.
+**2026-08-29:** Framework is stdlib `http.server` + `json`, not FastAPI + uvicorn + Pydantic. Change 1 (Chaquopy spike) rejected the FastAPI stack because `pydantic-core` is not on Chaquopy’s Android index — see the spike outcome at the top of this file.
+
+**Framework:** stdlib `http.server` + `json` (not FastAPI).
 
 ```
 backend/
-  requirements.txt              # fastapi, uvicorn, pydantic  (or empty / unused on stdlib path)
+  requirements.txt              # empty / unused on device; host tests use pytest
   app/
-    main.py                     # HTTP app, CORS for storefront origin, lifespan: expiry sweeper + confirm retry loop
+    main.py                     # HTTP app + CORS; expiry sweeper; C5 retry is a daemon worker thread (Phase 1), not an asyncio lifespan retry loop waiting on the request
     config.py                   # port 8787, bind 0.0.0.0, expiry 300s, PhonePe package id
     models.py                   # PendingEntry, CreditEvent, MatchEvent
     queue.py                    # C1 in-memory store + asyncio.Lock (see Change 3)

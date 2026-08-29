@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -11,8 +12,10 @@ from urllib.parse import urlparse
 
 from app.api import internal, storefront
 from app.api.storefront import ApiError
-from app.config import BIND_HOST, PORT, SWEEP_INTERVAL_SECONDS
+from app.config import BIND_HOST, MAX_HTTP_BODY_BYTES, PORT, SWEEP_INTERVAL_SECONDS
 from app.runtime import Runtime
+
+logger = logging.getLogger(__name__)
 
 _runtime: Runtime | None = None
 _loop: asyncio.AbstractEventLoop | None = None
@@ -43,7 +46,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 
     def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length") or "0")
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError as exc:
+            raise ApiError(400, "invalid Content-Length") from exc
+        if length < 0:
+            raise ApiError(400, "invalid Content-Length")
+        if length > MAX_HTTP_BODY_BYTES:
+            raise ApiError(413, "payload too large")
         raw = self.rfile.read(length) if length else b""
         if not raw:
             return {}
@@ -60,6 +70,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
+        if status >= 400:
+            self.send_header("Connection", "close")
         self._cors()
         self.end_headers()
         self.wfile.write(payload)
@@ -79,8 +91,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
         except ApiError as exc:
             self._send(exc.status, {"error": exc.message})
-        except Exception as exc:  # noqa: BLE001 — last-line HTTP guard
-            self._send(500, {"error": str(exc)})
+        except Exception:
+            logger.exception("GET handler failed path=%s", path)
+            self._send(500, {"error": "internal error"})
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
@@ -95,6 +108,10 @@ class Handler(BaseHTTPRequestHandler):
                 status, payload = _call(internal.ingest_notification(runtime, body))
                 self._send(status, payload)
                 return
+            if path == "/v1/internal/settings":
+                status, payload = _call(internal.update_settings(runtime, body))
+                self._send(status, payload)
+                return
             prefix = "/v1/internal/transactions/"
             suffix = "/confirm"
             if path.startswith(prefix) and path.endswith(suffix):
@@ -105,8 +122,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
         except ApiError as exc:
             self._send(exc.status, {"error": exc.message})
-        except Exception as exc:  # noqa: BLE001 — last-line HTTP guard
-            self._send(500, {"error": str(exc)})
+        except Exception:
+            logger.exception("POST handler failed path=%s", path)
+            self._send(500, {"error": "internal error"})
 
 
 async def _sweeper(runtime: Runtime) -> None:

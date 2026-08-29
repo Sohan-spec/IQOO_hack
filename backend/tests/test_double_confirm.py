@@ -28,6 +28,7 @@ async def _once() -> None:
     )
     assert first is not None
     assert second is not None
+    runtime.sender.wait_idle(timeout=2)
     assert len(sent) == 1
     assert runtime.queue.get_unlocked("s1").status == CONFIRMED
 

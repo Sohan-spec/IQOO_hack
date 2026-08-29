@@ -50,4 +50,15 @@ class PythonClient {
       throw StateError('confirm ${response.statusCode}: ${response.body}');
     }
   }
+
+  Future<void> setDefaultCallbackUrl(String url) async {
+    final response = await http.post(
+      Uri.parse('$pythonBase/v1/internal/settings'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'default_callback_url': url}),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('settings ${response.statusCode}: ${response.body}');
+    }
+  }
 }

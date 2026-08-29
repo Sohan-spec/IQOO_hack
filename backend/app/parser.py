@@ -1,7 +1,8 @@
 """C3 — extract credited amount and payer name; drop non-credits.
 
-Patterns are fixture-driven. They are not frozen against a demo PhonePe
-build until R3 capture replaces backend/app/fixtures/phonepe_credits.json.
+R3 capture from the demo iQOO is still pending. Regexes and
+backend/app/fixtures/phonepe_credits.json are placeholders, not strings
+captured from this device.
 """
 
 from __future__ import annotations

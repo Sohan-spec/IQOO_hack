@@ -87,6 +87,24 @@ class CreditEvent:
 
 
 @dataclass
+class RawNotification:
+    package: str
+    title: str
+    text: str
+    posted_at: datetime
+    parsed: bool
+
+    def to_public_dict(self) -> dict[str, Any]:
+        return {
+            "package": self.package,
+            "title": self.title,
+            "text": self.text,
+            "posted_at": self.posted_at.isoformat(),
+            "parsed": self.parsed,
+        }
+
+
+@dataclass
 class MatchEvent:
     session_id: str
     customer_name: str

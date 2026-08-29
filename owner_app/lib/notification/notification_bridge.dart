@@ -33,6 +33,18 @@ class DeviceBridge {
   Future<void> runSetupPrompts() {
     return _channel.invokeMethod<void>('runSetupPrompts');
   }
+
+  Future<String> getDefaultCallbackUrl() async {
+    final value = await _channel.invokeMethod<String>('getDefaultCallbackUrl');
+    return value ?? '';
+  }
+
+  Future<void> setDefaultCallbackUrl(String url) {
+    return _channel.invokeMethod<void>(
+      'setDefaultCallbackUrl',
+      <String, dynamic>{'url': url},
+    );
+  }
 }
 
 /// android.app.NotificationManager interruption filter constants.

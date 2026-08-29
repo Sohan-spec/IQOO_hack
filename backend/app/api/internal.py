@@ -1,11 +1,27 @@
 from __future__ import annotations
 
 from app.api.storefront import ApiError
+from app.confirm import is_callback_url
 from app.runtime import Runtime
 
 
 async def snapshot(runtime: Runtime) -> tuple[int, dict]:
     return 200, runtime.snapshot()
+
+
+async def update_settings(runtime: Runtime, body: dict) -> tuple[int, dict]:
+    if not isinstance(body, dict):
+        raise ApiError(400, "JSON object required")
+    if "default_callback_url" not in body:
+        raise ApiError(400, "default_callback_url is required")
+    value = body.get("default_callback_url")
+    if not isinstance(value, str):
+        raise ApiError(400, "default_callback_url must be a string")
+    url = value.strip()
+    if url and not is_callback_url(url):
+        raise ApiError(400, "default_callback_url must start with http:// or https://")
+    runtime.default_callback_url = url
+    return 200, {"default_callback_url": runtime.default_callback_url}
 
 
 async def ingest_notification(runtime: Runtime, body: dict) -> tuple[int, dict]:

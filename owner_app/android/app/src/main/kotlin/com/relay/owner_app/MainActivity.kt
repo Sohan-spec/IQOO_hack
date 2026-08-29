@@ -42,6 +42,12 @@ class MainActivity : FlutterActivity() {
                         runSetupPrompts()
                         result.success(null)
                     }
+                    "getDefaultCallbackUrl" ->
+                        result.success(getDefaultCallbackUrl())
+                    "setDefaultCallbackUrl" -> {
+                        setDefaultCallbackUrl(call.argument<String>("url") ?: "")
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -102,10 +108,23 @@ class MainActivity : FlutterActivity() {
         return enabled.contains(packageName)
     }
 
+    private fun getDefaultCallbackUrl(): String {
+        val prefs = getSharedPreferences(SETUP_PREFS, MODE_PRIVATE)
+        return prefs.getString(DEFAULT_CALLBACK_URL, "") ?: ""
+    }
+
+    private fun setDefaultCallbackUrl(url: String) {
+        getSharedPreferences(SETUP_PREFS, MODE_PRIVATE)
+            .edit()
+            .putString(DEFAULT_CALLBACK_URL, url)
+            .apply()
+    }
+
     companion object {
         const val CHANNEL = "com.relay.owner/device"
         const val REQUEST_POST_NOTIFICATIONS = 31
         const val SETUP_PREFS = "relay_setup"
         const val BATTERY_PROMPTED = "battery_prompted"
+        const val DEFAULT_CALLBACK_URL = "default_callback_url"
     }
 }
