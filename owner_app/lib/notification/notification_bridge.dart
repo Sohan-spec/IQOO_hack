@@ -29,6 +29,10 @@ class DeviceBridge {
   Future<void> requestIgnoreBatteryOptimizations() {
     return _channel.invokeMethod<void>('requestIgnoreBatteryOptimizations');
   }
+
+  Future<void> runSetupPrompts() {
+    return _channel.invokeMethod<void>('runSetupPrompts');
+  }
 }
 
 /// android.app.NotificationManager interruption filter constants.

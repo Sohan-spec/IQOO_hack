@@ -32,6 +32,7 @@ class _OperatorScreenState extends State<OperatorScreen> {
   void initState() {
     super.initState();
     _device.requestPostNotifications();
+    _device.runSetupPrompts();
     _refresh();
     _poll = Timer.periodic(const Duration(milliseconds: 500), (_) => _refresh());
   }

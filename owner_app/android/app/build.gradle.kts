@@ -18,8 +18,8 @@ android {
         applicationId = "com.relay.owner_app"
         minSdk = maxOf(24, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 5
+        versionName = "1.0.4"
         ndk {
             abiFilters.clear()
             abiFilters += listOf("arm64-v8a")

@@ -35,7 +35,11 @@ class MainActivity : FlutterActivity() {
                     "batteryOptimizationIgnored" ->
                         result.success(isBatteryOptimizationIgnored())
                     "requestIgnoreBatteryOptimizations" -> {
-                        requestIgnoreBatteryOptimizations()
+                        requestIgnoreBatteryOptimizations(once = false)
+                        result.success(null)
+                    }
+                    "runSetupPrompts" -> {
+                        runSetupPrompts()
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -45,8 +49,16 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
-        requestPostNotifications()
+        runSetupPrompts()
         KeepAliveService.start(this)
+    }
+
+    private fun runSetupPrompts() {
+        requestPostNotifications()
+        if (!isNotificationAccessGranted()) {
+            return
+        }
+        requestIgnoreBatteryOptimizations(once = true)
     }
 
     private fun isBatteryOptimizationIgnored(): Boolean {
@@ -54,10 +66,15 @@ class MainActivity : FlutterActivity() {
         return power.isIgnoringBatteryOptimizations(packageName)
     }
 
-    private fun requestIgnoreBatteryOptimizations() {
+    private fun requestIgnoreBatteryOptimizations(once: Boolean = false) {
         if (isBatteryOptimizationIgnored()) {
             return
         }
+        val prefs = getSharedPreferences(SETUP_PREFS, MODE_PRIVATE)
+        if (once && prefs.getBoolean(BATTERY_PROMPTED, false)) {
+            return
+        }
+        prefs.edit().putBoolean(BATTERY_PROMPTED, true).apply()
         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
             data = Uri.parse("package:$packageName")
         }
@@ -88,5 +105,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         const val CHANNEL = "com.relay.owner/device"
         const val REQUEST_POST_NOTIFICATIONS = 31
+        const val SETUP_PREFS = "relay_setup"
+        const val BATTERY_PROMPTED = "battery_prompted"
     }
 }

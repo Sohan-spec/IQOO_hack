@@ -19,6 +19,11 @@ class KeepAliveService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        val power = getSystemService(PowerManager::class.java)
+        wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Relay::BackendWakeLock").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
         val manager = getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(
             CHANNEL_ID,
@@ -37,11 +42,6 @@ class KeepAliveService : Service() {
             notification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
         )
-        val power = getSystemService(PowerManager::class.java)
-        wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "relay:cpu").apply {
-            setReferenceCounted(false)
-            acquire()
-        }
         val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "relay:wifi").apply {
             setReferenceCounted(false)

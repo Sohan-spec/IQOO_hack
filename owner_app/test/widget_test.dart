@@ -17,6 +17,8 @@ void main() {
             return 1;
           case 'batteryOptimizationIgnored':
             return true;
+          case 'runSetupPrompts':
+            return null;
           default:
             return null;
         }

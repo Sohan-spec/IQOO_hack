@@ -235,7 +235,7 @@ No other public routes.
 ## 6. Demo reliability mapped to this device
 
 - **R1** Manual confirm control on the pending list; same `confirm.py` as auto-match; shares the Change 3 lock with C4
-- **R2** Access indicator + blocking setup prompt; do not start the demo with access off. Foreground service + same-process listener so the grant stays live
+- **R2** Access indicator + blocking setup prompt; do not start the demo with access off. Foreground service + same-process listener so the grant stays live. Ignore-battery-optimizations is requested in the same setup pass. iQOO Autostart / background-power toggles are documented in `owner_app/DEVICE_SETUP.md` (cannot be granted from code).
 - **R3** Fixture file + pytest; on-device replay by POSTing a captured payload to `/v1/internal/notifications` (same path as the listener)
 - **R4 posture (code only):** bind `0.0.0.0:8787`; operator UI shows LAN URL for storefront/hotspot. Venue Wi-Fi vs hotspot is operational, not a software module
 - **R5** Operator UI warns from the **actual** `getCurrentInterruptionFilter()` value (Change 5); checklist: verify a PhonePe credit still reaches the listener under the demo settings (iQOO can suppress or delay)
