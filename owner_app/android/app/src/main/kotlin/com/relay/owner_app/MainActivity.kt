@@ -3,7 +3,9 @@ package com.relay.owner_app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
@@ -30,6 +32,12 @@ class MainActivity : FlutterActivity() {
                         requestPostNotifications()
                         result.success(null)
                     }
+                    "batteryOptimizationIgnored" ->
+                        result.success(isBatteryOptimizationIgnored())
+                    "requestIgnoreBatteryOptimizations" -> {
+                        requestIgnoreBatteryOptimizations()
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -38,7 +46,22 @@ class MainActivity : FlutterActivity() {
     override fun onResume() {
         super.onResume()
         requestPostNotifications()
-        startForegroundService(Intent(this, KeepAliveService::class.java))
+        KeepAliveService.start(this)
+    }
+
+    private fun isBatteryOptimizationIgnored(): Boolean {
+        val power = getSystemService(PowerManager::class.java)
+        return power.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun requestIgnoreBatteryOptimizations() {
+        if (isBatteryOptimizationIgnored()) {
+            return
+        }
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        startActivity(intent)
     }
 
     private fun requestPostNotifications() {

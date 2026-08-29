@@ -23,6 +23,7 @@ class _OperatorScreenState extends State<OperatorScreen> {
   Timer? _poll;
   Snapshot? _snapshot;
   bool _access = false;
+  bool _batteryOk = false;
   int _filter = 0;
   List<String> _lan = [];
   String? _error;
@@ -46,6 +47,7 @@ class _OperatorScreenState extends State<OperatorScreen> {
       final snapshot = await _python.snapshot();
       final access = await _device.notificationAccessGranted();
       final filter = await _device.interruptionFilter();
+      final batteryOk = await _device.batteryOptimizationIgnored();
       final lan = await LanEndpoint.discover();
       if (!mounted) {
         return;
@@ -54,6 +56,7 @@ class _OperatorScreenState extends State<OperatorScreen> {
         _snapshot = snapshot;
         _access = access;
         _filter = filter;
+        _batteryOk = batteryOk;
         _lan = lan;
         _error = null;
       });
@@ -87,6 +90,17 @@ class _OperatorScreenState extends State<OperatorScreen> {
             onOpenSettings: _device.openNotificationAccessSettings,
           ),
           DndStatus(filter: _filter),
+          ListTile(
+            leading: Icon(
+              _batteryOk ? Icons.battery_charging_full : Icons.battery_alert,
+              color: _batteryOk ? const Color(0xFF3DDC97) : const Color(0xFFE8A838),
+            ),
+            title: Text(_batteryOk ? 'Battery optimization off' : 'Allow background run'),
+            subtitle: const Text(
+              'Screen can be off. On iQOO also: Autostart on, lock Relay in recents, do not swipe it away.',
+            ),
+            onTap: _batteryOk ? null : _device.requestIgnoreBatteryOptimizations,
+          ),
           LanEndpoint(urls: _lan),
           MatchBanner(match: snapshot?.recentMatches.firstOrNull),
           const Divider(),

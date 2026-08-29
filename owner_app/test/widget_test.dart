@@ -15,6 +15,8 @@ void main() {
             return false;
           case 'getInterruptionFilter':
             return 1;
+          case 'batteryOptimizationIgnored':
+            return true;
           default:
             return null;
         }

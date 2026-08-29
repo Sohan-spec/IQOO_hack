@@ -20,6 +20,15 @@ class DeviceBridge {
   Future<void> requestPostNotifications() {
     return _channel.invokeMethod<void>('requestPostNotifications');
   }
+
+  Future<bool> batteryOptimizationIgnored() async {
+    final value = await _channel.invokeMethod<bool>('batteryOptimizationIgnored');
+    return value ?? false;
+  }
+
+  Future<void> requestIgnoreBatteryOptimizations() {
+    return _channel.invokeMethod<void>('requestIgnoreBatteryOptimizations');
+  }
 }
 
 /// android.app.NotificationManager interruption filter constants.
