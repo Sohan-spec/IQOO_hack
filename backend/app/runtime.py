@@ -174,6 +174,8 @@ class Runtime:
         live = self.queue.get_unlocked(event.session_id)
         if live is not None:
             item["status"] = live.status
+            # Read on the asyncio-loop thread; the confirm worker writes this
+            # bool. Only atomic-attribute writes are allowed on this field.
             item["confirm_acked"] = live.confirm_acked
         else:
             item.setdefault("status", "confirmed")

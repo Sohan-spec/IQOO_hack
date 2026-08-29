@@ -68,6 +68,30 @@ def test_enqueue_without_callback_url_fails_when_default_empty() -> None:
     asyncio.run(_run())
 
 
+def test_enqueue_rejects_zero_amount() -> None:
+    async def _run() -> None:
+        from app.api.storefront import ApiError
+        from app.runtime import Runtime
+
+        runtime = Runtime()
+        try:
+            await enqueue(
+                runtime,
+                {
+                    "session_id": "s-zero",
+                    "customer_name": "Priya",
+                    "amount": "0.00",
+                    "callback_url": "http://storefront/confirm",
+                },
+            )
+            raise AssertionError("expected ApiError")
+        except ApiError as exc:
+            assert exc.status == 400
+            assert "amount" in exc.message
+
+    asyncio.run(_run())
+
+
 def test_enqueue_without_callback_url_uses_operator_default() -> None:
     async def _run() -> None:
         from app.runtime import Runtime

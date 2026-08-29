@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:owner_app/api/python_client.dart';
 import 'package:owner_app/main.dart';
 
 void _mockDevice(WidgetTester tester, {required bool accessGranted}) {
@@ -38,6 +39,18 @@ Future<void> _disposeOperator(WidgetTester tester) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('Snapshot keeps default_callback_url from the backend', () {
+    final snapshot = Snapshot.fromJson({
+      'pending': <Object>[],
+      'recent_credits': <Object>[],
+      'recent_matches': <Object>[],
+      'default_callback_url': 'http://storefront.example/confirm',
+      'server': {'bind': '0.0.0.0:8787'},
+    });
+    expect(snapshot.defaultCallbackUrl, 'http://storefront.example/confirm');
+    expect(Snapshot.fromJson({}).defaultCallbackUrl, '');
+  });
 
   testWidgets('operator screen loads', (WidgetTester tester) async {
     _mockDevice(tester, accessGranted: false);

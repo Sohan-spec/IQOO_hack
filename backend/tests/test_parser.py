@@ -9,7 +9,7 @@ FIXTURES = Path(__file__).resolve().parent.parent / "app" / "fixtures" / "phonep
 
 
 def test_fixtures_parse_as_expected() -> None:
-    rows = json.loads(FIXTURES.read_text())
+    rows = json.loads(FIXTURES.read_text(encoding="utf-8"))
     for row in rows:
         parsed = parse_credit(row["title"], row["text"])
         if row["expect_credit"]:

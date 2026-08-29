@@ -4,7 +4,7 @@
 Not product code. Not Module A. Stdlib only.
 
 Prints enqueue-sent and callback-received timestamps. The elapsed figure
-is enqueue→callback, NOT G6 (G6 is pay-tap → callback).
+is enqueue->callback, NOT G6 (G6 is pay-tap -> callback).
 """
 
 from __future__ import annotations
@@ -24,8 +24,8 @@ LISTEN_PORT_DEFAULT = 8790
 CUSTOMER_DEFAULT = "Demo Customer"
 AMOUNT_DEFAULT = "1.00"
 G6_NOTE = (
-    "elapsed is enqueue→callback, NOT G6 "
-    "(G6 is pay-tap in the sending app → this callback)"
+    "elapsed is enqueue->callback, NOT G6 "
+    "(G6 is pay-tap in the sending app -> this callback)"
 )
 
 

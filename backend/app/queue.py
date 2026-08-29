@@ -8,6 +8,10 @@ from app.state import PENDING, mark_expired
 
 
 class TransactionQueue:
+    """In-memory session store. Confirmed/expired rows are never evicted:
+    snapshot live-ack lookup needs the entry present for confirm_acked.
+    """
+
     def __init__(self) -> None:
         self.lock = asyncio.Lock()
         self._entries: dict[str, PendingEntry] = {}

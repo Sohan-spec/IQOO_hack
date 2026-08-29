@@ -21,9 +21,10 @@ def parse_amount(value: Any) -> Decimal:
         amount = Decimal(str(value).strip().replace(",", ""))
     except (InvalidOperation, ValueError) as exc:
         raise ValueError("amount is not a valid decimal") from exc
-    if amount < 0:
-        raise ValueError("amount must be >= 0")
-    return amount.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+    amount = amount.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+    if amount <= 0:
+        raise ValueError("amount must be > 0")
+    return amount
 
 
 def parse_iso(value: str | None) -> datetime:

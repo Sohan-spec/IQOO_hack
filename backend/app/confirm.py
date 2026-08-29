@@ -123,6 +123,8 @@ class ConfirmationSender:
                 time.sleep(delay)
             ok, reason = self._attempt(entry.callback_url, payload)
             if ok:
+                # Written on the confirm worker thread; snapshot() reads this
+                # on the asyncio loop. Keep this an atomic attribute write.
                 entry.confirm_acked = True
                 return True
             last_reason = reason

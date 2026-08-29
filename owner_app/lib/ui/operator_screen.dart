@@ -64,6 +64,20 @@ class _OperatorScreenState extends State<OperatorScreen> {
     }
   }
 
+  /// Re-push the device-persisted default if Python lost it (process restart).
+  Future<void> _resyncDefaultCallbackUrl(Snapshot snapshot) async {
+    try {
+      final deviceUrl = await _device.getDefaultCallbackUrl();
+      if (snapshot.defaultCallbackUrl.trim() == deviceUrl.trim()) {
+        return;
+      }
+      await _python.setDefaultCallbackUrl(deviceUrl);
+    } catch (_) {
+      // Next poll retries. Keep _callbackPushed; mismatch detection recovers
+      // a restarted Python process without clobbering an in-progress edit.
+    }
+  }
+
   Future<void> _refresh() async {
     var access = _access;
     try {
@@ -91,6 +105,10 @@ class _OperatorScreenState extends State<OperatorScreen> {
     await _pushDefaultCallbackUrl();
     try {
       final snapshot = await _python.snapshot();
+      if (!mounted) {
+        return;
+      }
+      await _resyncDefaultCallbackUrl(snapshot);
       if (!mounted) {
         return;
       }

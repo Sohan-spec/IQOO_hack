@@ -9,12 +9,14 @@ class Snapshot {
     required this.recentCredits,
     required this.recentMatches,
     required this.bind,
+    required this.defaultCallbackUrl,
   });
 
   final List<Map<String, dynamic>> pending;
   final List<Map<String, dynamic>> recentCredits;
   final List<Map<String, dynamic>> recentMatches;
   final String bind;
+  final String defaultCallbackUrl;
 
   factory Snapshot.fromJson(Map<String, dynamic> json) {
     return Snapshot(
@@ -22,6 +24,7 @@ class Snapshot {
       recentCredits: _maps(json['recent_credits']),
       recentMatches: _maps(json['recent_matches']),
       bind: (json['server'] is Map ? json['server']['bind'] : null)?.toString() ?? '0.0.0.0:8787',
+      defaultCallbackUrl: json['default_callback_url']?.toString() ?? '',
     );
   }
 
