@@ -3,6 +3,9 @@
 R3 capture from the demo iQOO is still pending. Regexes and
 backend/app/fixtures/phonepe_credits.json are placeholders, not strings
 captured from this device.
+
+Last-4 payer phone matching is validated-false until a real OS banner
+is shown to contain that field. Do not extract a last-4 into payer_name.
 """
 
 from __future__ import annotations

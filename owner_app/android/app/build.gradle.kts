@@ -18,12 +18,23 @@ android {
         applicationId = "com.relay.owner_app"
         minSdk = maxOf(24, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
-        versionCode = 5
-        versionName = "1.0.4"
+        versionCode = 11
+        versionName = "1.0.10"
         ndk {
             abiFilters.clear()
             abiFilters += listOf("arm64-v8a")
         }
+        buildConfigField(
+            "String",
+            "RELAY_WS_URL",
+            "\"${project.findProperty("RELAY_WS_URL") ?: "wss://sohan-spec--relay.modal.run/connect"}\"",
+        )
+        // RELAY_SECRET and CHECKOUT_CONFIRM_SECRET are not baked into the APK.
+        // Paste them on the Settings screen; they are stored with Keystore-backed DataStore.
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -53,4 +64,9 @@ chaquopy {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
 }

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
-from app.config import DEFAULT_CALLBACK_URL, EXPIRY_SECONDS
+from app.config import DEFAULT_CALLBACK_URL, EXPIRY_SECONDS, PII_TTL_SECONDS
 from app.confirm import ConfirmationSender
 from app.events import EventLog
 from app.matcher import select_candidate
@@ -20,7 +20,7 @@ from app.models import (
 )
 from app.parser import parse_credit
 from app.queue import TransactionQueue
-from app.state import PENDING, mark_confirmed
+from app.state import CONFIRMED, PENDING, mark_confirmed
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,8 @@ class Runtime:
         customer_name: str,
         amount,
         callback_url: str,
+        customer_phone: str | None = None,
+        customer_email: str | None = None,
     ) -> tuple[str, PendingEntry]:
         url = (callback_url or self.default_callback_url).strip()
         entry = PendingEntry(
@@ -54,6 +56,8 @@ class Runtime:
             created_at=utcnow(),
             status=PENDING,
             callback_url=url,
+            customer_phone=customer_phone,
+            customer_email=customer_email,
         )
         return await self.queue.enqueue(entry)
 
@@ -112,6 +116,7 @@ class Runtime:
             if winner is None or not mark_confirmed(winner):
                 return None
             matched = winner
+            matched.confirmed_at = utcnow()
         self.events.add_match(
             MatchEvent(
                 session_id=matched.session_id,
@@ -133,6 +138,7 @@ class Runtime:
             if not mark_confirmed(entry):
                 return None
             matched = entry
+            matched.confirmed_at = utcnow()
         self.events.add_match(
             MatchEvent(
                 session_id=matched.session_id,
@@ -146,7 +152,21 @@ class Runtime:
         return matched
 
     async def sweep_expired(self) -> None:
-        await self.queue.expire_due(utcnow(), self.expiry)
+        expired = await self.queue.expire_due(utcnow(), self.expiry)
+        for entry in expired:
+            self._clear_pii(entry)
+        now = utcnow()
+        ttl = timedelta(seconds=PII_TTL_SECONDS)
+        for entry in self.queue.all_unlocked():
+            if entry.status != CONFIRMED or entry.confirmed_at is None:
+                continue
+            if now - entry.confirmed_at > ttl:
+                self._clear_pii(entry)
+
+    @staticmethod
+    def _clear_pii(entry: PendingEntry) -> None:
+        entry.customer_phone = None
+        entry.customer_email = None
 
     def snapshot(self) -> dict:
         now = utcnow()

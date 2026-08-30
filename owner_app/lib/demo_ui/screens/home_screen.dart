@@ -134,7 +134,7 @@ class _SecHead extends StatelessWidget {
 class _HeroCard extends StatelessWidget {
   const _HeroCard({required this.total, required this.count});
 
-  final int total;
+  final num total;
   final int count;
 
   @override

@@ -7,6 +7,7 @@ import 'screens/home_screen.dart';
 import 'screens/payments_screen.dart';
 import 'screens/settings_screen.dart';
 import 'tokens.dart';
+import 'widgets/access_gate.dart';
 import 'widgets/confirm_sheet.dart';
 import 'widgets/toast.dart';
 
@@ -24,6 +25,7 @@ class _DemoShellState extends State<DemoShell> {
   void initState() {
     super.initState();
     controller = DemoController();
+    controller.start();
   }
 
   @override
@@ -85,27 +87,29 @@ class _DemoShellState extends State<DemoShell> {
                   ),
                 ),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: IgnorePointer(
-                  ignoring: !controller.sheetOpen,
-                  child: AnimatedSlide(
-                    offset: controller.sheetOpen
-                        ? Offset.zero
-                        : const Offset(0, 1.02),
-                    duration: const Duration(milliseconds: 340),
-                    curve: const Cubic(0.2, 0.9, 0.25, 1.0),
-                    child: ConfirmSheet(
-                      payment: controller.sheetPayment ??
-                          controller.payments.first,
-                      onConfirm: controller.confirmPayment,
-                      onReject: controller.rejectPayment,
+              if (controller.sheetPayment != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    ignoring: !controller.sheetOpen,
+                    child: AnimatedSlide(
+                      offset: controller.sheetOpen
+                          ? Offset.zero
+                          : const Offset(0, 1.02),
+                      duration: const Duration(milliseconds: 340),
+                      curve: const Cubic(0.2, 0.9, 0.25, 1.0),
+                      child: ConfirmSheet(
+                        payment: controller.sheetPayment!,
+                        onConfirm: () {
+                          controller.confirmPayment();
+                        },
+                        onReject: controller.rejectPayment,
+                      ),
                     ),
                   ),
                 ),
-              ),
               Positioned(
                 left: 20,
                 right: 20,
@@ -126,6 +130,12 @@ class _DemoShellState extends State<DemoShell> {
                   ),
                 ),
               ),
+              if (!controller.notifAccessOn)
+                Positioned.fill(
+                  child: DemoAccessGate(
+                    onOpenSettings: controller.openNotificationAccessSettings,
+                  ),
+                ),
             ],
           ),
         );

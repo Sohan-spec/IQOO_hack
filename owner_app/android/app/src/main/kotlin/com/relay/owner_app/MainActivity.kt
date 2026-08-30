@@ -1,6 +1,7 @@
 package com.relay.owner_app
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -23,7 +24,7 @@ class MainActivity : FlutterActivity() {
                     "notificationAccessGranted" ->
                         result.success(isNotificationAccessGranted())
                     "openNotificationAccessSettings" -> {
-                        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        openNotificationListenerSettings()
                         result.success(null)
                     }
                     "getInterruptionFilter" ->
@@ -48,6 +49,25 @@ class MainActivity : FlutterActivity() {
                         setDefaultCallbackUrl(call.argument<String>("url") ?: "")
                         result.success(null)
                     }
+                    "relayConnected" ->
+                        result.success(RelayIngress.connected)
+                    "relayMerchantId" ->
+                        result.success(RelayIngress.merchantId)
+                    "relaySecretConfigured" ->
+                        result.success(RelayIngress.secretConfigured)
+                    "setRelaySecret" -> {
+                        val secret = call.argument<String>("secret") ?: ""
+                        DeviceIdentityStore(this).saveHmacSecret(secret)
+                        RelayIngress.applyHmacSecret(secret)
+                        result.success(null)
+                    }
+                    "checkoutConfirmSecretConfigured" ->
+                        result.success(DeviceIdentityStore(this).confirmSecretConfigured())
+                    "setCheckoutConfirmSecret" -> {
+                        val secret = call.argument<String>("secret") ?: ""
+                        ConfirmSecrets.apply(this, secret)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -60,11 +80,22 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun runSetupPrompts() {
-        requestPostNotifications()
         if (!isNotificationAccessGranted()) {
             return
         }
+        requestPostNotifications()
         requestIgnoreBatteryOptimizations(once = true)
+    }
+
+    private fun openNotificationListenerSettings() {
+        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            intent.putExtra(
+                Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                ComponentName(this, RelayNotificationListener::class.java).flattenToString(),
+            )
+        }
+        startActivity(intent)
     }
 
     private fun isBatteryOptimizationIgnored(): Boolean {
@@ -104,8 +135,18 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun isNotificationAccessGranted(): Boolean {
-        val enabled = NotificationManagerCompat.getEnabledListenerPackages(this)
-        return enabled.contains(packageName)
+        if (NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)) {
+            return true
+        }
+        val flat = Settings.Secure.getString(
+            contentResolver,
+            "enabled_notification_listeners",
+        ) ?: return false
+        val listener = ComponentName(this, RelayNotificationListener::class.java)
+        return flat.split(':').any { entry ->
+            val cn = ComponentName.unflattenFromString(entry)
+            cn?.packageName == packageName || cn == listener
+        }
     }
 
     private fun getDefaultCallbackUrl(): String {

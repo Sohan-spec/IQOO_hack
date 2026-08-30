@@ -46,29 +46,117 @@ class SettingsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SectionCard(
+              SectionCard(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                   child: Row(
                     children: [
-                      _Dot(),
-                      SizedBox(width: 12),
+                      _Dot(on: controller.relayConnected),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Listening for payments',
                               style: RText.statusTitle,
                             ),
                             Padding(
-                              padding: EdgeInsets.only(top: 3),
+                              padding: const EdgeInsets.only(top: 3),
                               child: Text(
-                                "Rahul's Pixel, connected",
+                                controller.relayConnected
+                                    ? 'Relay connected'
+                                    : 'Relay disconnected',
                                 style: RText.statusSub,
                               ),
                             ),
+                            if (controller.relayMerchantId.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3),
+                                child: Text(
+                                  controller.relayMerchantId,
+                                  style: RText.statusSub,
+                                ),
+                              ),
                           ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const _GroupLabel('Relay'),
+              SectionCard(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        controller.relaySecretConfigured
+                            ? 'HMAC secret is stored on this phone'
+                            : 'Paste the Modal RELAY_SECRET to connect',
+                        style: RText.miTitle,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: controller.relaySecretController,
+                        obscureText: true,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        style: RText.searchInput,
+                        decoration: const InputDecoration(
+                          hintText: 'RELAY_SECRET',
+                          hintStyle: RText.miSub,
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: GestureDetector(
+                          onTap: controller.saveRelaySecret,
+                          child: const Text('Save secret', style: RText.link),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const _GroupLabel('Checkout confirm'),
+              SectionCard(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        controller.checkoutConfirmSecretConfigured
+                            ? 'Confirm secret is stored on this phone'
+                            : 'Paste CHECKOUT_CONFIRM_SECRET so C5 can sign /confirm',
+                        style: RText.miTitle,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: controller.checkoutConfirmSecretController,
+                        obscureText: true,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        style: RText.searchInput,
+                        decoration: const InputDecoration(
+                          hintText: 'CHECKOUT_CONFIRM_SECRET',
+                          hintStyle: RText.miSub,
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: GestureDetector(
+                          onTap: controller.saveCheckoutConfirmSecret,
+                          child: const Text('Save secret', style: RText.link),
                         ),
                       ),
                     ],
@@ -90,9 +178,11 @@ class SettingsScreen extends StatelessWidget {
                     MenuItem(
                       title: 'Notification access',
                       showChevron: false,
+                      onTap: controller.openNotificationAccessSettings,
                       trailing: PillSwitch(
                         value: controller.notifAccessOn,
-                        onChanged: (_) => controller.toggleNotifAccess(),
+                        onChanged: (_) =>
+                            controller.openNotificationAccessSettings(),
                       ),
                     ),
                     MenuItem(
@@ -123,15 +213,17 @@ class SettingsScreen extends StatelessWidget {
 }
 
 class _Dot extends StatelessWidget {
-  const _Dot();
+  const _Dot({required this.on});
+
+  final bool on;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 9,
       height: 9,
-      decoration: const BoxDecoration(
-        color: RColors.green,
+      decoration: BoxDecoration(
+        color: on ? RColors.green : RColors.red,
         shape: BoxShape.circle,
       ),
     );

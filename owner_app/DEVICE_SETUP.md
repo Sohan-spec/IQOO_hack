@@ -4,9 +4,9 @@ Relay's wake lock, foreground service, and the Android "ignore battery optimizat
 
 ## Must do in-app (first launch)
 
-1. Allow **notifications** (`POST_NOTIFICATIONS`) when Android asks.
-2. **Notification access** — the operator screen is blocked until this is granted. Tap the prompt, enable Relay Owner. Required before any live PhonePe test.
-3. **Ignore battery optimizations** — system dialog: Allow Relay Owner to ignore battery optimizations. This is the same setup pass as notification access; grant it before the demo, not during a live pay.
+1. **Notification access** (not the Allow notifications popup) — the app stays gated until this is granted. Tap **Open notification access**, enable **Relay Owner**. Required before any live PhonePe test.
+2. Allow **notifications** (`POST_NOTIFICATIONS`) when Android asks — this only appears after listener access is on, and is for Relay's own foreground notification.
+3. **Ignore battery optimizations** — system dialog: Allow Relay Owner to ignore battery optimizations. Grant it before the demo, not during a live pay.
 
 ## Must do in iQOO settings (no API)
 

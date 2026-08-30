@@ -7,6 +7,10 @@ step 0: candidates = entries where status == pending
 4. Else oldest created_at
 5. Zero candidates → no confirm
 6. Confirm at most once (enforced by the confirm critical section, not here)
+
+customer_email is display-only. This module must never read it.
+Last-4 phone matching is not live until Phase 2 captures a real PhonePe
+banner that actually contains a payer phone tail (validated-false until then).
 """
 
 from __future__ import annotations

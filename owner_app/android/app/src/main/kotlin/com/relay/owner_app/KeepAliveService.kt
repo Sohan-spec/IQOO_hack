@@ -42,6 +42,7 @@ class KeepAliveService : Service() {
             notification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
         )
+        RelayIngress.start(this)
         val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "relay:wifi").apply {
             setReferenceCounted(false)
@@ -54,6 +55,7 @@ class KeepAliveService : Service() {
     }
 
     override fun onDestroy() {
+        RelayIngress.stop()
         wakeLock?.let { if (it.isHeld) it.release() }
         wifiLock?.let { if (it.isHeld) it.release() }
         super.onDestroy()

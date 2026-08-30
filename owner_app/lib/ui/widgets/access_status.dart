@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Full-body R2 gate. Shown instead of the operator UI until notification access is granted.
+/// Full-body R2 gate. Shown until the NotificationListenerService is enabled.
 class AccessGate extends StatelessWidget {
   const AccessGate({super.key, required this.onOpenSettings});
 
@@ -11,23 +11,25 @@ class AccessGate extends StatelessWidget {
     final theme = Theme.of(context);
     return Material(
       color: theme.scaffoldBackgroundColor,
-      child: InkWell(
-        onTap: onOpenSettings,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(Icons.notifications_off, size: 48, color: Color(0xFFE85D4C)),
-              const SizedBox(height: 20),
-              Text('Notification access required', style: theme.textTheme.titleLarge),
-              const SizedBox(height: 12),
-              Text(
-                'Grant notification access before anything else is usable. Tap to open system settings.',
-                style: theme.textTheme.bodyMedium,
-              ),
-            ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Icon(Icons.notifications_off, size: 48, color: Color(0xFFE85D4C)),
+            const SizedBox(height: 20),
+            Text('Notification access required', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Text(
+              'Android\'s Allow notifications popup is not enough. Open system settings and turn on Relay Owner under Notification access (sometimes labelled Device & app notifications).',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 28),
+            FilledButton(
+              onPressed: onOpenSettings,
+              child: const Text('Open notification access'),
+            ),
+          ],
         ),
       ),
     );

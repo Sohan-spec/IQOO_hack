@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:owner_app/demo_ui/demo_app.dart';
 import 'package:owner_app/ui/operator_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const RelayOwnerApp());
+  runApp(const DemoApp());
 }
 
+/// Debug/operator UI. Kept so existing widget tests and a fallback entry still compile.
 class RelayOwnerApp extends StatelessWidget {
   const RelayOwnerApp({super.key});
 

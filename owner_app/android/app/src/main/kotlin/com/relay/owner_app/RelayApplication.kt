@@ -13,7 +13,9 @@ class RelayApplication : PyApplication() {
             // Android 16 may deny FGS start until the user has opened the app.
         }
         Thread({
-            Python.getInstance().getModule("app.main").callAttr("start")
+            val py = Python.getInstance()
+            ConfirmSecrets.loadIntoPython(this)
+            py.getModule("app.main").callAttr("start")
         }, "relay-http").start()
     }
 }

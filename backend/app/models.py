@@ -51,6 +51,9 @@ class PendingEntry:
     status: str
     callback_url: str
     confirm_acked: bool = False
+    customer_phone: str | None = None
+    customer_email: str | None = None
+    confirmed_at: datetime | None = None
 
     def to_public_dict(self, now: datetime | None = None) -> dict[str, Any]:
         clock = now or utcnow()
@@ -63,6 +66,8 @@ class PendingEntry:
             "status": self.status,
             "confirm_acked": self.confirm_acked,
             "elapsed_seconds": max(0, int(elapsed)),
+            "customer_phone": self.customer_phone,
+            "customer_email": self.customer_email,
         }
 
 

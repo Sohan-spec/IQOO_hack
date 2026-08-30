@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import queue
 import threading
 import time
@@ -20,6 +21,19 @@ from app.models import PendingEntry
 logger = logging.getLogger(__name__)
 
 JsonPoster = Callable[[str, dict[str, Any]], Awaitable[bool]]
+
+_confirm_secret = ""
+
+
+def set_confirm_secret(secret: str) -> None:
+    """Store CHECKOUT_CONFIRM_SECRET for outbound C5 POSTs. Called from the phone."""
+    global _confirm_secret
+    _confirm_secret = (secret or "").strip()
+
+
+def confirm_secret() -> str:
+    return _confirm_secret or os.environ.get("CHECKOUT_CONFIRM_SECRET", "").strip()
+
 
 # No FileHandler / FTPHandler / HTTPRedirectHandler: callback_url is
 # merchant-controlled (C5). Default urlopen would follow a 3xx to file://.
@@ -45,11 +59,15 @@ def _post_json_with_reason(url: str, payload: dict[str, Any]) -> tuple[bool, str
     if not is_callback_url(url):
         return False, "invalid_url"
     data = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    secret = confirm_secret()
+    if secret:
+        headers["Authorization"] = f"Bearer {secret}"
     request = urllib.request.Request(
         url,
         data=data,
         method="POST",
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers=headers,
     )
     try:
         # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected -- reason: C5 POSTs to merchant callback_url; scheme is http/https via urlsplit and this opener has no FileHandler or redirect handler

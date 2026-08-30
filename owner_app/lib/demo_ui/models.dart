@@ -1,8 +1,10 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:owner_app/api/python_client.dart';
+import 'package:owner_app/notification/notification_bridge.dart';
 
+import 'mapping.dart';
 import 'tokens.dart';
 
 enum PayStatus { pending, successful, failed }
@@ -31,30 +33,52 @@ class Payment {
     required this.clock,
     required this.relative,
     this.ref,
+    this.email,
+    this.phone,
   });
 
   final String id;
   String name;
-  int amount;
+  num amount;
   PayStatus status;
   String group;
   String clock;
   String relative;
   String? ref;
+  String? email;
+  String? phone;
 }
 
-String money(int n) {
-  var s = n.abs().toString();
-  if (s.length <= 3) return '₹$s';
-  final last3 = s.substring(s.length - 3);
-  s = s.substring(0, s.length - 3);
-  final parts = <String>[last3];
-  while (s.length > 2) {
-    parts.insert(0, s.substring(s.length - 2));
-    s = s.substring(0, s.length - 2);
+String money(num n) {
+  final negative = n < 0;
+  final scaled = (n.abs() * 100).round();
+  final rupees = scaled ~/ 100;
+  final paise = scaled % 100;
+  var s = rupees.toString();
+  String grouped;
+  if (s.length <= 3) {
+    grouped = s;
+  } else {
+    final last3 = s.substring(s.length - 3);
+    s = s.substring(0, s.length - 3);
+    final parts = <String>[last3];
+    while (s.length > 2) {
+      parts.insert(0, s.substring(s.length - 2));
+      s = s.substring(0, s.length - 2);
+    }
+    if (s.isNotEmpty) {
+      parts.insert(0, s);
+    }
+    grouped = parts.join(',');
   }
-  if (s.isNotEmpty) parts.insert(0, s);
-  return '₹${parts.join(',')}';
+  var out = '₹$grouped';
+  if (paise != 0) {
+    out = '$out.${paise.toString().padLeft(2, '0')}';
+  }
+  if (negative) {
+    return '-$out';
+  }
+  return out;
 }
 
 String initials(String name) {
@@ -64,102 +88,41 @@ String initials(String name) {
       .map((w) => w[0])
       .join()
       .toUpperCase();
-  if (chars.length <= 2) return chars;
+  if (chars.length <= 2) {
+    return chars;
+  }
   return chars.substring(0, 2);
 }
 
-String nextRef() {
-  final n = 400000000000 + (math.Random().nextDouble() * 500000000000).floor();
-  return n.toString();
-}
+class DemoController extends ChangeNotifier with WidgetsBindingObserver {
+  DemoController({
+    PythonClient? python,
+    DeviceBridge? device,
+  })  : _python = python ?? PythonClient(),
+        _device = device ?? DeviceBridge();
 
-String nowClock() {
-  final now = DateTime.now();
-  final period = now.hour >= 12 ? 'PM' : 'AM';
-  var hour = now.hour % 12;
-  if (hour == 0) hour = 12;
-  final hh = hour.toString().padLeft(2, '0');
-  final mm = now.minute.toString().padLeft(2, '0');
-  return '$hh:$mm $period';
-}
-
-List<Payment> seedPayments() {
-  return [
-    Payment(
-      id: 'p1',
-      name: 'Rahul Sharma',
-      amount: 850,
-      status: PayStatus.pending,
-      group: 'today',
-      clock: '10:24 AM',
-      relative: '2 min ago',
-      ref: nextRef(),
-    ),
-    Payment(
-      id: 'r1',
-      name: 'Karan Mehta',
-      amount: 1200,
-      status: PayStatus.successful,
-      group: 'today',
-      clock: '09:48 AM',
-      relative: 'Just now',
-    ),
-    Payment(
-      id: 'r2',
-      name: 'Ananya Verma',
-      amount: 450,
-      status: PayStatus.successful,
-      group: 'today',
-      clock: '09:15 AM',
-      relative: '8 min ago',
-    ),
-    Payment(
-      id: 'p2',
-      name: 'Ananya Verma',
-      amount: 1150,
-      status: PayStatus.pending,
-      group: 'yesterday',
-      clock: '07:30 PM',
-      relative: '4 min ago',
-      ref: nextRef(),
-    ),
-    Payment(
-      id: 'r3',
-      name: 'Rohit Singh',
-      amount: 650,
-      status: PayStatus.successful,
-      group: 'yesterday',
-      clock: '06:20 PM',
-      relative: '21 min ago',
-    ),
-    Payment(
-      id: 'f1',
-      name: 'Neha Gupta',
-      amount: 800,
-      status: PayStatus.failed,
-      group: 'yesterday',
-      clock: '05:45 PM',
-      relative: '34 min ago',
-    ),
-  ];
-}
-
-class DemoController extends ChangeNotifier {
-  DemoController() : payments = seedPayments();
-
-  final List<Payment> payments;
+  final PythonClient _python;
+  final DeviceBridge _device;
   final searchController = TextEditingController();
+  final relaySecretController = TextEditingController();
+  final checkoutConfirmSecretController = TextEditingController();
 
-  int total = 12450;
-  int count = 14;
+  List<Payment> payments = [];
+  num total = 0;
+  int count = 0;
   int currentTab = 0;
   int lastTab = 0;
   bool showingSettings = false;
   PayStatus? chipFilter;
   String searchQuery = '';
-  bool notifAccessOn = true;
+  bool notifAccessOn = false;
+  bool relayConnected = false;
+  String relayMerchantId = '';
+  bool relaySecretConfigured = false;
+  bool checkoutConfirmSecretConfigured = false;
   bool confirmAutoOn = false;
   bool soundOn = true;
+  bool unreachable = false;
 
   Payment? sheetPayment;
   bool sheetOpen = false;
@@ -167,6 +130,9 @@ class DemoController extends ChangeNotifier {
   String toastMessage = 'Payment confirmed';
   bool toastVisible = false;
   Timer? _toastTimer;
+  Timer? _poll;
+  bool _started = false;
+  bool _disposed = false;
 
   List<Payment> get pending =>
       payments.where((p) => p.status == PayStatus.pending).toList();
@@ -177,10 +143,69 @@ class DemoController extends ChangeNotifier {
   List<Payment> get filteredPayments {
     final q = searchQuery.toLowerCase();
     return payments.where((p) {
-      if (chipFilter != null && p.status != chipFilter) return false;
-      if (q.isNotEmpty && !p.name.toLowerCase().contains(q)) return false;
+      if (chipFilter != null && p.status != chipFilter) {
+        return false;
+      }
+      if (q.isNotEmpty && !p.name.toLowerCase().contains(q)) {
+        return false;
+      }
       return true;
     }).toList();
+  }
+
+  void start() {
+    if (_started) {
+      return;
+    }
+    _started = true;
+    WidgetsBinding.instance.addObserver(this);
+    _device.runSetupPrompts();
+    _refresh();
+    _poll = Timer.periodic(const Duration(milliseconds: 500), (_) => _refresh());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _device.runSetupPrompts();
+      _refresh();
+    }
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final access = await _device.notificationAccessGranted();
+      final relay = await _device.relayConnected();
+      final merchantId = await _device.relayMerchantId();
+      final secretOn = await _device.relaySecretConfigured();
+      final confirmOn = await _device.checkoutConfirmSecretConfigured();
+      if (!_disposed) {
+        notifAccessOn = access;
+        relayConnected = relay;
+        relayMerchantId = merchantId;
+        relaySecretConfigured = secretOn;
+        checkoutConfirmSecretConfigured = confirmOn;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Keep last known access; fail closed on the initial false.
+    }
+    try {
+      final snap = await _python.snapshot();
+      if (_disposed) {
+        return;
+      }
+      payments = paymentsFromSnapshot(snap);
+      final today = todayTotals(snap);
+      total = today.total;
+      count = today.count;
+      unreachable = false;
+    } catch (_) {
+      unreachable = true;
+    }
+    if (!_disposed) {
+      notifyListeners();
+    }
   }
 
   void goToTab(int index) {
@@ -223,41 +248,72 @@ class DemoController extends ChangeNotifier {
   }
 
   void closeSheet() {
-    if (!sheetOpen) return;
+    if (!sheetOpen) {
+      return;
+    }
     sheetOpen = false;
     notifyListeners();
   }
 
-  void confirmPayment() {
+  Future<void> confirmPayment() async {
     final p = sheetPayment;
-    if (p == null) return;
-    p.status = PayStatus.successful;
-    p.relative = 'Just now';
-    p.clock = nowClock();
-    p.group = 'today';
-    payments.remove(p);
-    payments.insert(0, p);
-    total += p.amount;
-    count += 1;
+    if (p == null) {
+      return;
+    }
     closeSheet();
-    showToast('Payment confirmed');
+    try {
+      await _python.manualConfirm(p.id);
+      showToast('Payment confirmed');
+    } catch (_) {
+      showToast('Already confirmed');
+    }
+    if (!_disposed) {
+      await _refresh();
+    }
   }
 
   void rejectPayment() {
-    final p = sheetPayment;
-    if (p == null) return;
-    p.status = PayStatus.failed;
     closeSheet();
-    showToast('Payment rejected');
+  }
+
+  void openNotificationAccessSettings() {
+    _device.openNotificationAccessSettings();
+  }
+
+  Future<void> saveRelaySecret() async {
+    final secret = relaySecretController.text.trim();
+    if (secret.isEmpty) {
+      showToast('Paste the Modal RELAY_SECRET first');
+      return;
+    }
+    try {
+      await _device.setRelaySecret(secret);
+      relaySecretController.clear();
+      showToast('Relay secret saved');
+    } catch (_) {
+      showToast('Could not save relay secret');
+    }
+    await _refresh();
+  }
+
+  Future<void> saveCheckoutConfirmSecret() async {
+    final secret = checkoutConfirmSecretController.text.trim();
+    if (secret.isEmpty) {
+      showToast('Paste CHECKOUT_CONFIRM_SECRET first');
+      return;
+    }
+    try {
+      await _device.setCheckoutConfirmSecret(secret);
+      checkoutConfirmSecretController.clear();
+      showToast('Checkout confirm secret saved');
+    } catch (_) {
+      showToast('Could not save checkout confirm secret');
+    }
+    await _refresh();
   }
 
   void toggleConfirmAuto() {
     confirmAutoOn = !confirmAutoOn;
-    notifyListeners();
-  }
-
-  void toggleNotifAccess() {
-    notifAccessOn = !notifAccessOn;
     notifyListeners();
   }
 
@@ -267,11 +323,17 @@ class DemoController extends ChangeNotifier {
   }
 
   void showToast(String msg) {
+    if (_disposed) {
+      return;
+    }
     toastMessage = msg;
     toastVisible = true;
     notifyListeners();
     _toastTimer?.cancel();
     _toastTimer = Timer(const Duration(milliseconds: 2200), () {
+      if (_disposed) {
+        return;
+      }
       toastVisible = false;
       notifyListeners();
     });
@@ -279,8 +341,13 @@ class DemoController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    _poll?.cancel();
     _toastTimer?.cancel();
     searchController.dispose();
+    relaySecretController.dispose();
+    checkoutConfirmSecretController.dispose();
     super.dispose();
   }
 }

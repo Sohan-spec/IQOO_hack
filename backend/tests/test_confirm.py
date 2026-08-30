@@ -163,6 +163,54 @@ def test_file_and_empty_urls_are_rejected() -> None:
     assert is_callback_url("http://127.0.0.1:9/confirm") is True
 
 
+def test_confirm_post_sends_bearer_secret() -> None:
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from app.confirm import _post_json_with_reason, set_confirm_secret
+
+    captured: dict[str, str] = {}
+
+    class CaptureHandler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            captured["authorization"] = self.headers.get("Authorization") or ""
+            length = int(self.headers.get("Content-Length") or "0")
+            if length:
+                self.rfile.read(length)
+            body = b'{"ok":true}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args) -> None:
+            return
+
+    set_confirm_secret("checkout-confirm-test-secret")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), CaptureHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/confirm"
+        ok, reason = _post_json_with_reason(
+            url, {"session_id": "s1", "status": "confirmed"}
+        )
+        assert ok is True
+        assert reason == "ok"
+        assert captured["authorization"] == "Bearer checkout-confirm-test-secret"
+        set_confirm_secret("")
+        captured.clear()
+        ok_plain, _ = _post_json_with_reason(
+            url, {"session_id": "s2", "status": "confirmed"}
+        )
+        assert ok_plain is True
+        assert captured.get("authorization", "") == ""
+    finally:
+        set_confirm_secret("")
+        server.shutdown()
+        server.server_close()
+
+
 def test_http_redirect_is_not_success() -> None:
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 

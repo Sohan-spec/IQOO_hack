@@ -41,6 +41,16 @@ class PaymentRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (payment.phone != null && payment.phone!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(payment.phone!, style: RText.rowTime),
+                  ),
+                if (payment.email != null && payment.email!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(payment.email!, style: RText.rowTime),
+                  ),
                 const SizedBox(height: 4),
                 Text(secondary, style: RText.rowTime),
               ],

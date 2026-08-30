@@ -106,3 +106,54 @@ def test_enqueue_without_callback_url_uses_operator_default() -> None:
         assert entry.callback_url == "http://storefront.example/confirm"
 
     asyncio.run(_run())
+
+
+def test_enqueue_stores_optional_phone_and_email() -> None:
+    async def _run() -> None:
+        from app.runtime import Runtime
+
+        runtime = Runtime()
+        status, body = await enqueue(
+            runtime,
+            {
+                "session_id": "s-pii",
+                "customer_name": "Priya",
+                "amount": "10.00",
+                "callback_url": "http://storefront/confirm",
+                "customer_phone": "+91 98765-43210",
+                "customer_email": "priya@example.com",
+            },
+        )
+        assert status == 201
+        assert body["session_id"] == "s-pii"
+        snap = runtime.snapshot()
+        row = snap["pending"][0]
+        assert row["customer_phone"] == "9876543210"
+        assert row["customer_email"] == "priya@example.com"
+
+    asyncio.run(_run())
+
+
+def test_enqueue_rejects_bad_phone() -> None:
+    async def _run() -> None:
+        from app.api.storefront import ApiError
+        from app.runtime import Runtime
+
+        runtime = Runtime()
+        try:
+            await enqueue(
+                runtime,
+                {
+                    "session_id": "s-bad-phone",
+                    "customer_name": "Priya",
+                    "amount": "10.00",
+                    "callback_url": "http://storefront/confirm",
+                    "customer_phone": "123",
+                },
+            )
+            raise AssertionError("expected ApiError")
+        except ApiError as exc:
+            assert exc.status == 400
+            assert "phone" in exc.message
+
+    asyncio.run(_run())

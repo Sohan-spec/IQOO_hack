@@ -45,6 +45,42 @@ class DeviceBridge {
       <String, dynamic>{'url': url},
     );
   }
+
+  Future<bool> relayConnected() async {
+    final value = await _channel.invokeMethod<bool>('relayConnected');
+    return value ?? false;
+  }
+
+  Future<String> relayMerchantId() async {
+    final value = await _channel.invokeMethod<String>('relayMerchantId');
+    return value ?? '';
+  }
+
+  Future<bool> relaySecretConfigured() async {
+    final value = await _channel.invokeMethod<bool>('relaySecretConfigured');
+    return value ?? false;
+  }
+
+  Future<void> setRelaySecret(String secret) {
+    return _channel.invokeMethod<void>(
+      'setRelaySecret',
+      <String, dynamic>{'secret': secret},
+    );
+  }
+
+  Future<bool> checkoutConfirmSecretConfigured() async {
+    final value = await _channel.invokeMethod<bool>(
+      'checkoutConfirmSecretConfigured',
+    );
+    return value ?? false;
+  }
+
+  Future<void> setCheckoutConfirmSecret(String secret) {
+    return _channel.invokeMethod<void>(
+      'setCheckoutConfirmSecret',
+      <String, dynamic>{'secret': secret},
+    );
+  }
 }
 
 /// android.app.NotificationManager interruption filter constants.

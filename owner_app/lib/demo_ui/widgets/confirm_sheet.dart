@@ -56,6 +56,10 @@ class ConfirmSheet extends StatelessWidget {
             child: Text(money(payment.amount), style: RText.sheetBig),
           ),
           _Kv(label: 'From', value: payment.name),
+          if (payment.phone != null && payment.phone!.isNotEmpty)
+            _Kv(label: 'Mobile', value: payment.phone!),
+          if (payment.email != null && payment.email!.isNotEmpty)
+            _Kv(label: 'Email', value: payment.email!),
           _Kv(label: 'Detected', value: payment.relative),
           _Kv(label: 'UPI reference', value: payment.ref ?? ''),
           Padding(

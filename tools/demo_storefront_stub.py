@@ -117,6 +117,8 @@ def enqueue_transaction(
     amount: str,
     callback_url: str,
     phone_port: int = PHONE_PORT_DEFAULT,
+    enqueue_url: str | None = None,
+    merchant_id: str | None = None,
 ) -> tuple[datetime, dict]:
     payload = {
         "session_id": session_id,
@@ -124,10 +126,17 @@ def enqueue_transaction(
         "amount": amount,
         "callback_url": callback_url,
     }
+    if merchant_id:
+        payload["merchant_id"] = merchant_id
     data = json.dumps(payload).encode("utf-8")
-    if "://" in phone_host or "/" in phone_host:
-        raise RuntimeError("phone-host must be a hostname or IP")
-    url = f"http://{phone_host}:{phone_port}/v1/transactions"
+    if enqueue_url:
+        if not enqueue_url.startswith("http://") and not enqueue_url.startswith("https://"):
+            raise RuntimeError("relay-url must start with http:// or https://")
+        url = enqueue_url
+    else:
+        if "://" in phone_host or "/" in phone_host:
+            raise RuntimeError("phone-host must be a hostname or IP")
+        url = f"http://{phone_host}:{phone_port}/v1/transactions"
     request = urllib.request.Request(
         url,
         data=data,
@@ -135,8 +144,9 @@ def enqueue_transaction(
         headers={"Content-Type": "application/json"},
     )
     sent_at = utcnow()
+    timeout = 10 if enqueue_url else 5
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected -- reason: URL scheme is fixed to http; host cannot contain :// or /
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected -- reason: URL is http(s) only; host is CLI phone-host or --relay-url
             raw = response.read().decode("utf-8")
             status = getattr(response, "status", 200)
     except urllib.error.HTTPError as exc:
@@ -189,6 +199,13 @@ def build_parser() -> argparse.ArgumentParser:
             "  python3 tools/demo_storefront_stub.py "
             "--phone-host 127.0.0.1 --callback-host 127.0.0.1\n"
             "\n"
+            "Cross-network via relay:\n"
+            "  python3 tools/demo_storefront_stub.py \\\n"
+            "    --relay-url https://sohan-spec--relay.modal.run/v1/transactions \\\n"
+            "    --merchant-id <uuid-from-owner-app> \\\n"
+            "    --callback-host <public-or-reachable-laptop> \\\n"
+            "    --amount 1.00\n"
+            "\n"
             f"{G6_NOTE}."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -240,6 +257,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=180.0,
         help="Seconds to wait for the C5 callback. Default: 180",
     )
+    parser.add_argument(
+        "--relay-url",
+        default=None,
+        help=(
+            "Public POST URL (https://<relay>/v1/transactions). "
+            "When set, enqueue goes through the relay instead of --phone-host. "
+            "Requires --merchant-id. Direct LAN path is unchanged when omitted."
+        ),
+    )
+    parser.add_argument(
+        "--merchant-id",
+        default=None,
+        help="Routing id from the owner app (required with --relay-url).",
+    )
     return parser
 
 
@@ -252,6 +283,13 @@ def main(argv: list[str] | None = None) -> int:
             "pass --callback-host <laptop-hotspot-ip> for a phone demo",
             file=sys.stderr,
         )
+
+    if args.relay_url and not args.merchant_id:
+        print("--merchant-id is required with --relay-url", file=sys.stderr)
+        return 2
+    if args.merchant_id and not args.relay_url:
+        print("--relay-url is required with --merchant-id", file=sys.stderr)
+        return 2
 
     server, state = start_listener(args.listen_host, args.listen_port)
     listen_port = server.server_address[1]
@@ -270,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
             args.amount,
             callback_url,
             phone_port=args.phone_port,
+            enqueue_url=args.relay_url,
+            merchant_id=args.merchant_id,
         )
         print_enqueue(sent_at, session_id, args.amount, callback_url)
         print("waiting        for C5 callback (pay that amount, or R1-confirm)", flush=True)

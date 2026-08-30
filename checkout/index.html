@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Pay</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 28rem; margin: 2rem auto; padding: 0 1rem; color: #111; }
+    label { display: block; margin: 0.85rem 0 0.25rem; font-size: 0.9rem; }
+    input { width: 100%; box-sizing: border-box; padding: 0.55rem 0.6rem; font-size: 1rem; }
+    button { margin-top: 1.25rem; width: 100%; padding: 0.75rem; font-size: 1rem; }
+    .payee { font-size: 0.9rem; color: #444; margin-bottom: 1.25rem; }
+    .hint { font-size: 0.8rem; color: #666; }
+    .panel { display: none; }
+    .panel.on { display: block; }
+    h1 { font-size: 1.35rem; }
+  </style>
+</head>
+<body>
+  <div id="form" class="panel on">
+    <h1>Pay</h1>
+    <p class="payee">Paying <strong>__PAYEE__</strong><br/>UPI ID __VPA__</p>
+    <label>Name</label>
+    <input id="name" autocomplete="name" required/>
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="email"/>
+    <label>Mobile number linked to your UPI app</label>
+    <input id="phone" type="tel" inputmode="numeric" autocomplete="tel"/>
+    <p class="hint">Used only to match your payment if two people pay the same amount.</p>
+    <label>Amount (INR)</label>
+    <input id="amount" type="text" inputmode="decimal" value="1.00"/>
+    <button type="button" id="pay">Pay</button>
+  </div>
+  <div id="wait" class="panel">
+    <h1>Waiting for payment</h1>
+    <p>Complete the payment in your UPI app. This page updates when the merchant phone confirms it.</p>
+  </div>
+  <div id="done" class="panel">
+    <h1>Payment received — order confirmed</h1>
+  </div>
+  <script>
+    const RELAY_URL = "__RELAY_URL__";
+    const CALLBACK_URL = "__CALLBACK_URL__";
+    const VPA = "__VPA__";
+    const PAYEE = "__PAYEE__";
+    const MERCHANT_ID = "__MERCHANT_ID__";
+
+    const form = document.getElementById("form");
+    const wait = document.getElementById("wait");
+    const done = document.getElementById("done");
+    let sessionId = "";
+    let pollTimer = 0;
+
+    function show(el) {
+      form.classList.remove("on");
+      wait.classList.remove("on");
+      done.classList.remove("on");
+      el.classList.add("on");
+    }
+
+    async function pollStatus() {
+      if (!sessionId) return;
+      try {
+        const res = await fetch("/status/" + encodeURIComponent(sessionId), { cache: "no-store" });
+        const body = await res.json();
+        if (body.status === "confirmed") {
+          window.clearInterval(pollTimer);
+          show(done);
+        }
+      } catch (_) {}
+    }
+
+    document.getElementById("pay").addEventListener("click", () => {
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const amount = document.getElementById("amount").value.trim();
+      if (!name || !amount) {
+        return;
+      }
+      sessionId = crypto.randomUUID();
+      const payload = {
+        merchant_id: MERCHANT_ID,
+        session_id: sessionId,
+        customer_name: name,
+        customer_email: email,
+        customer_phone: phone,
+        amount: amount,
+        callback_url: CALLBACK_URL,
+      };
+      show(wait);
+      // Enqueue and UPI redirect are concurrent. Do not await enqueue first.
+      fetch(RELAY_URL + "/v1/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+        mode: "cors",
+      });
+      // tr= is for the paying app / audit only. It does not appear in the
+      // owner's PhonePe credit notification and is not used for matching.
+      const qs = new URLSearchParams({
+        pa: VPA,
+        pn: PAYEE,
+        am: amount,
+        cu: "INR",
+        tr: sessionId,
+      });
+      window.location.href = "upi://pay?" + qs.toString();
+      pollTimer = window.setInterval(pollStatus, 2000);
+      pollStatus();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        pollStatus();
+      }
+    });
+  </script>
+</body>
+</html>

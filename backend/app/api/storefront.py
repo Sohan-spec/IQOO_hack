@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.models import parse_amount
+from app.phone import normalize_in_mobile
 from app.runtime import Runtime
 
 
@@ -34,11 +35,30 @@ async def enqueue(runtime: Runtime, body: dict) -> tuple[int, dict]:
         parse_amount(body.get("amount"))
     except ValueError as exc:
         raise ApiError(400, str(exc)) from exc
+    email = body.get("customer_email")
+    if email is None:
+        customer_email = None
+    elif not isinstance(email, str):
+        raise ApiError(400, "customer_email must be a string")
+    else:
+        customer_email = email.strip() or None
+    raw_phone = body.get("customer_phone")
+    if raw_phone is None:
+        customer_phone = None
+    elif not isinstance(raw_phone, str):
+        raise ApiError(400, "customer_phone must be a string")
+    else:
+        try:
+            customer_phone = normalize_in_mobile(raw_phone)
+        except ValueError as exc:
+            raise ApiError(400, str(exc)) from exc
     outcome, entry = await runtime.enqueue(
         session_id,
         customer_name,
         body.get("amount"),
         callback_url,
+        customer_phone=customer_phone,
+        customer_email=customer_email,
     )
     public = {
         "session_id": entry.session_id,

@@ -9,6 +9,7 @@ import 'package:owner_app/ui/widgets/dnd_status.dart';
 import 'package:owner_app/ui/widgets/lan_endpoint.dart';
 import 'package:owner_app/ui/widgets/match_banner.dart';
 import 'package:owner_app/ui/widgets/pending_list.dart';
+import 'package:owner_app/ui/widgets/relay_status.dart';
 
 class OperatorScreen extends StatefulWidget {
   const OperatorScreen({super.key});
@@ -21,6 +22,8 @@ class _OperatorScreenState extends State<OperatorScreen> {
   final _python = PythonClient();
   final _device = DeviceBridge();
   final _callbackController = TextEditingController();
+  final _secretController = TextEditingController();
+  final _confirmSecretController = TextEditingController();
   Timer? _poll;
   Snapshot? _snapshot;
   bool _access = false;
@@ -28,13 +31,16 @@ class _OperatorScreenState extends State<OperatorScreen> {
   bool _callbackPushed = false;
   int _filter = 0;
   List<String> _lan = [];
+  bool _relayConnected = false;
+  String _relayMerchantId = '';
+  bool _relaySecretConfigured = false;
+  bool _checkoutConfirmSecretConfigured = false;
   String? _error;
   String? _callbackError;
 
   @override
   void initState() {
     super.initState();
-    _device.requestPostNotifications();
     _device.runSetupPrompts();
     _pushDefaultCallbackUrl();
     _refresh();
@@ -45,6 +51,8 @@ class _OperatorScreenState extends State<OperatorScreen> {
   void dispose() {
     _poll?.cancel();
     _callbackController.dispose();
+    _secretController.dispose();
+    _confirmSecretController.dispose();
     super.dispose();
   }
 
@@ -92,15 +100,24 @@ class _OperatorScreenState extends State<OperatorScreen> {
       final filter = await _device.interruptionFilter();
       final batteryOk = await _device.batteryOptimizationIgnored();
       final lan = await LanEndpoint.discover();
+      final relayConnected = await _device.relayConnected();
+      final relayMerchantId = await _device.relayMerchantId();
+      final relaySecretConfigured = await _device.relaySecretConfigured();
+      final checkoutConfirmSecretConfigured =
+          await _device.checkoutConfirmSecretConfigured();
       if (mounted) {
         setState(() {
           _filter = filter;
           _batteryOk = batteryOk;
           _lan = lan;
+          _relayConnected = relayConnected;
+          _relayMerchantId = relayMerchantId;
+          _relaySecretConfigured = relaySecretConfigured;
+          _checkoutConfirmSecretConfigured = checkoutConfirmSecretConfigured;
         });
       }
     } catch (_) {
-      // Leave DND / battery / LAN rows on the last successful poll.
+      // Leave DND / battery / LAN / relay rows on the last successful poll.
     }
     await _pushDefaultCallbackUrl();
     try {
@@ -134,6 +151,24 @@ class _OperatorScreenState extends State<OperatorScreen> {
       return;
     }
     await _refresh();
+  }
+
+  Future<void> _saveRelaySecret() async {
+    final secret = _secretController.text.trim();
+    if (secret.isEmpty) {
+      return;
+    }
+    await _device.setRelaySecret(secret);
+    _secretController.clear();
+  }
+
+  Future<void> _saveCheckoutConfirmSecret() async {
+    final secret = _confirmSecretController.text.trim();
+    if (secret.isEmpty) {
+      return;
+    }
+    await _device.setCheckoutConfirmSecret(secret);
+    _confirmSecretController.clear();
   }
 
   Future<void> _saveDefaultCallbackUrl() async {
@@ -174,6 +209,7 @@ class _OperatorScreenState extends State<OperatorScreen> {
             subtitle: Text(_error!),
           ),
         const AccessStatus(),
+        RelayStatus(connected: _relayConnected, merchantId: _relayMerchantId),
         DndStatus(filter: _filter),
         ListTile(
           leading: Icon(
@@ -187,6 +223,64 @@ class _OperatorScreenState extends State<OperatorScreen> {
           onTap: _batteryOk ? null : _device.requestIgnoreBatteryOptimizations,
         ),
         LanEndpoint(urls: _lan),
+        ExpansionTile(
+          title: const Text('Relay HMAC secret'),
+          subtitle: Text(
+            _relaySecretConfigured
+                ? 'Stored on device. Paste again to rotate.'
+                : 'Paste the Modal RELAY_SECRET so this phone can connect',
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: TextField(
+                controller: _secretController,
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: const InputDecoration(
+                  labelText: 'RELAY_SECRET',
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _saveRelaySecret,
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+        ExpansionTile(
+          title: const Text('Checkout confirm secret'),
+          subtitle: Text(
+            _checkoutConfirmSecretConfigured
+                ? 'Stored on device. Paste again to rotate.'
+                : 'Paste CHECKOUT_CONFIRM_SECRET so C5 can sign /confirm',
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: TextField(
+                controller: _confirmSecretController,
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: const InputDecoration(
+                  labelText: 'CHECKOUT_CONFIRM_SECRET',
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _saveCheckoutConfirmSecret,
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
         ExpansionTile(
           title: const Text('Default callback URL'),
           subtitle: const Text('Used when the storefront omits callback_url'),
