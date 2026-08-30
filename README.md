@@ -6,21 +6,7 @@ This repo is the working three-party loop: a public Pay page, a cloud ingress th
 
 ## How a payment is confirmed
 
-```
- Customer browser                 Cloud                      Owner Android phone
- ┌─────────────────┐         ┌──────────────┐         ┌──────────────────────────┐
- │ checkout/       │  POST   │ relay/       │  WS     │ owner_app + backend/     │
- │ Pay page        │────────▶│ Modal ingress│────────▶│ queue / parser / matcher │
- │                 │         └──────────────┘         │                          │
- │ upi://pay?…     │                                  │ PhonePe notif (Kotlin)   │
- │        │        │                                  │        │                 │
- │        ▼        │                                  │        ▼                 │
- │  (customer UPI  │         UPI credit ─────────────▶│ match amount (+ name)    │
- │   app, not ours)│                                  │                          │
- │                 │◀──────── POST /confirm ──────────│ C5 callback (Bearer)     │
- │ poll /status    │         checkout/                └──────────────────────────┘
- └─────────────────┘
-```
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/6ec3c120-81e5-40f6-a962-d3bdd1323b93" />
 
 1. Customer opens the Pay page, enters name (and optional email / phone), taps **Pay**.
 2. The page fires two things at once: enqueue `POST {RELAY_URL}/v1/transactions`, and redirect into a UPI app (`upi://pay?pa=…&am=…`).
