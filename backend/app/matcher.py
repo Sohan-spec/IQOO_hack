@@ -3,14 +3,16 @@
 step 0: candidates = entries where status == pending
 1. Amount exact Decimal equality
 2. Drop candidates older than the expiry window
-3. If multiple remain, normalised case-insensitive name compare
-4. Else oldest created_at
-5. Zero candidates → no confirm
-6. Confirm at most once (enforced by the confirm critical section, not here)
+3. If multiple remain: last-4 of stored customer_phone vs extracted
+   payer_phone_last4. A mismatch does not reject; it only narrows when at
+   least one candidate matches. A single amount+window candidate always
+   wins even when the typed phone tail differs from the banner.
+4. If still multiple: normalised case-insensitive name compare
+5. Else oldest created_at
+6. Zero candidates → no confirm
+7. Confirm at most once (enforced by the confirm critical section, not here)
 
 customer_email is display-only. This module must never read it.
-Last-4 phone matching is not live until Phase 2 captures a real PhonePe
-banner that actually contains a payer phone tail (validated-false until then).
 """
 
 from __future__ import annotations
@@ -26,6 +28,13 @@ _WS = re.compile(r"\s+")
 
 def normalize_name(name: str) -> str:
     return _WS.sub(" ", name.casefold()).strip()
+
+
+def stored_phone_last4(entry: PendingEntry) -> str | None:
+    phone = entry.customer_phone
+    if not phone or len(phone) < 4 or not phone[-4:].isdigit():
+        return None
+    return phone[-4:]
 
 
 def select_candidate(
@@ -45,12 +54,22 @@ def select_candidate(
     if not candidates:
         return None
 
-    # 3. Name as a secondary signal — only when more than one amount match remains.
+    # 3. Last-4 — only when more than one amount+window match remains.
+    if len(candidates) > 1 and credit.payer_phone_last4:
+        tailed = [
+            entry
+            for entry in candidates
+            if stored_phone_last4(entry) == credit.payer_phone_last4
+        ]
+        if tailed:
+            candidates = tailed
+
+    # 4. Name as a secondary signal — only when more than one match remains.
     if len(candidates) > 1 and credit.payer_name:
         target = normalize_name(credit.payer_name)
         named = [entry for entry in candidates if normalize_name(entry.customer_name) == target]
         if named:
             candidates = named
 
-    # 4. Oldest-first tie-break.
+    # 5. Oldest-first tie-break.
     return min(candidates, key=lambda entry: entry.created_at)

@@ -1,6 +1,10 @@
+import base64
+import html as html_lib
+import re
+
 from fastapi.testclient import TestClient
 
-from app import create_app
+from app import create_app, upi_pay_payload
 
 _SECRET = "a" * 64
 
@@ -69,6 +73,23 @@ def test_pay_page_has_no_vpa_input(monkeypatch) -> None:
     assert "merchant@upi" in html
     assert "upi://pay" in html
     assert "tr=" in html
+    assert "relay_pay_session" in html
+    assert "pageshow" in html
+    assert "customer_phone: phone" in html
+    assert "Demo Shop" in html
+    assert "AYUSH RAR" not in html
+    assert 'get("demo") === "1"' in html
+    assert "demo-4562-349" in html
+    assert "SOHAN REDDY P" in html
+    assert "9108234562" in html
+    assert "watchedSessionIds" in html
+    payload = upi_pay_payload("merchant@upi", "Demo Shop")
+    assert f'id="upi-id">merchant@upi<' in html
+    assert f'data-upi="{html_lib.escape(payload, quote=True)}"' in html
+    png = re.search(r'src="data:image/png;base64,([A-Za-z0-9+/=]+)"', html)
+    assert png, "pay page must embed a PNG QR"
+    raw = base64.b64decode(png.group(1))
+    assert raw[:8] == b"\x89PNG\r\n\x1a\n"
     assert _SECRET not in html
     assert "X-Confirm-Secret" not in html
 

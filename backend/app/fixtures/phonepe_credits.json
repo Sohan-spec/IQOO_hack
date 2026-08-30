@@ -24,6 +24,24 @@
     "name": "A KUMAR"
   },
   {
+    "id": "credit_masked_last4_listener_title",
+    "title": "******4562: ******4562",
+    "text": "sent ₹349 to you.",
+    "expect_credit": true,
+    "amount": "349.00",
+    "name": "",
+    "last4": "4562"
+  },
+  {
+    "id": "credit_masked_last4_os_shade_title",
+    "title": "PhonePe · ******4562 · Now",
+    "text": "sent ₹1 to you.",
+    "expect_credit": true,
+    "amount": "1.00",
+    "name": "",
+    "last4": "4562"
+  },
+  {
     "id": "debit_paid",
     "title": "Payment successful",
     "text": "You paid Rs. 150.00 to RELAY STORE",

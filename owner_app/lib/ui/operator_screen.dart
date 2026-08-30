@@ -35,6 +35,9 @@ class _OperatorScreenState extends State<OperatorScreen> {
   String _relayMerchantId = '';
   bool _relaySecretConfigured = false;
   bool _checkoutConfirmSecretConfigured = false;
+  bool _relaySecretVisible = false;
+  bool _confirmSecretVisible = false;
+  bool _secretsFilled = false;
   String? _error;
   String? _callbackError;
 
@@ -116,6 +119,7 @@ class _OperatorScreenState extends State<OperatorScreen> {
           _checkoutConfirmSecretConfigured = checkoutConfirmSecretConfigured;
         });
       }
+      await _fillSecretFieldsOnce();
     } catch (_) {
       // Leave DND / battery / LAN / relay rows on the last successful poll.
     }
@@ -141,6 +145,28 @@ class _OperatorScreenState extends State<OperatorScreen> {
     }
   }
 
+  Future<void> _fillSecretFieldsOnce() async {
+    if (_secretsFilled || !mounted) {
+      return;
+    }
+    _secretsFilled = true;
+    try {
+      final relay = await _device.relaySecret();
+      final confirm = await _device.checkoutConfirmSecret();
+      if (!mounted) {
+        return;
+      }
+      if (_secretController.text.isEmpty && relay.isNotEmpty) {
+        _secretController.text = relay;
+      }
+      if (_confirmSecretController.text.isEmpty && confirm.isNotEmpty) {
+        _confirmSecretController.text = confirm;
+      }
+    } catch (_) {
+      _secretsFilled = false;
+    }
+  }
+
   Future<void> _confirm(String sessionId) async {
     try {
       await _python.manualConfirm(sessionId);
@@ -159,7 +185,6 @@ class _OperatorScreenState extends State<OperatorScreen> {
       return;
     }
     await _device.setRelaySecret(secret);
-    _secretController.clear();
   }
 
   Future<void> _saveCheckoutConfirmSecret() async {
@@ -168,7 +193,6 @@ class _OperatorScreenState extends State<OperatorScreen> {
       return;
     }
     await _device.setCheckoutConfirmSecret(secret);
-    _confirmSecretController.clear();
   }
 
   Future<void> _saveDefaultCallbackUrl() async {
@@ -235,11 +259,21 @@ class _OperatorScreenState extends State<OperatorScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: TextField(
                 controller: _secretController,
-                obscureText: true,
+                obscureText: !_relaySecretVisible,
                 autocorrect: false,
                 enableSuggestions: false,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'RELAY_SECRET',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _relaySecretVisible
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () => setState(
+                      () => _relaySecretVisible = !_relaySecretVisible,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -264,11 +298,21 @@ class _OperatorScreenState extends State<OperatorScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: TextField(
                 controller: _confirmSecretController,
-                obscureText: true,
+                obscureText: !_confirmSecretVisible,
                 autocorrect: false,
                 enableSuggestions: false,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'CHECKOUT_CONFIRM_SECRET',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _confirmSecretVisible
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () => setState(
+                      () => _confirmSecretVisible = !_confirmSecretVisible,
+                    ),
+                  ),
                 ),
               ),
             ),

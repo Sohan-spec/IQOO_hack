@@ -7,6 +7,7 @@ import com.chaquo.python.android.PyApplication
 class RelayApplication : PyApplication() {
     override fun onCreate() {
         super.onCreate()
+        DebugSecretBootstrap.installIfNeeded(this)
         try {
             KeepAliveService.start(this)
         } catch (_: Exception) {

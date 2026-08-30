@@ -28,7 +28,13 @@ List<Payment> paymentsFromSnapshot(Snapshot snap) {
 ({num total, int count}) todayTotals(Snapshot snap) {
   var total = 0.0;
   var count = 0;
+  final seen = <String>{};
   for (final row in snap.recentMatches) {
+    final id = row['session_id']?.toString() ?? '';
+    if (id.isEmpty || seen.contains(id)) {
+      continue;
+    }
+    seen.add(id);
     final iso = row['matched_at']?.toString() ?? row['at']?.toString() ?? '';
     if (!_isLocalToday(iso)) {
       continue;

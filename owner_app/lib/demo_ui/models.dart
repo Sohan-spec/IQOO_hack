@@ -120,7 +120,9 @@ class DemoController extends ChangeNotifier with WidgetsBindingObserver {
   String relayMerchantId = '';
   bool relaySecretConfigured = false;
   bool checkoutConfirmSecretConfigured = false;
-  bool confirmAutoOn = false;
+  bool relaySecretVisible = false;
+  bool confirmSecretVisible = false;
+  bool confirmAutoOn = true;
   bool soundOn = true;
   bool unreachable = false;
 
@@ -133,6 +135,7 @@ class DemoController extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _poll;
   bool _started = false;
   bool _disposed = false;
+  bool _secretsFilled = false;
 
   List<Payment> get pending =>
       payments.where((p) => p.status == PayStatus.pending).toList();
@@ -187,6 +190,7 @@ class DemoController extends ChangeNotifier with WidgetsBindingObserver {
         checkoutConfirmSecretConfigured = confirmOn;
         notifyListeners();
       }
+      await _fillSecretFieldsOnce();
     } catch (_) {
       // Keep last known access; fail closed on the initial false.
     }
@@ -206,6 +210,38 @@ class DemoController extends ChangeNotifier with WidgetsBindingObserver {
     if (!_disposed) {
       notifyListeners();
     }
+  }
+
+  Future<void> _fillSecretFieldsOnce() async {
+    if (_secretsFilled || _disposed) {
+      return;
+    }
+    _secretsFilled = true;
+    try {
+      final relay = await _device.relaySecret();
+      final confirm = await _device.checkoutConfirmSecret();
+      if (_disposed) {
+        return;
+      }
+      if (relaySecretController.text.isEmpty && relay.isNotEmpty) {
+        relaySecretController.text = relay;
+      }
+      if (checkoutConfirmSecretController.text.isEmpty && confirm.isNotEmpty) {
+        checkoutConfirmSecretController.text = confirm;
+      }
+    } catch (_) {
+      _secretsFilled = false;
+    }
+  }
+
+  void toggleRelaySecretVisible() {
+    relaySecretVisible = !relaySecretVisible;
+    notifyListeners();
+  }
+
+  void toggleConfirmSecretVisible() {
+    confirmSecretVisible = !confirmSecretVisible;
+    notifyListeners();
   }
 
   void goToTab(int index) {
@@ -288,7 +324,6 @@ class DemoController extends ChangeNotifier with WidgetsBindingObserver {
     }
     try {
       await _device.setRelaySecret(secret);
-      relaySecretController.clear();
       showToast('Relay secret saved');
     } catch (_) {
       showToast('Could not save relay secret');
@@ -304,7 +339,6 @@ class DemoController extends ChangeNotifier with WidgetsBindingObserver {
     }
     try {
       await _device.setCheckoutConfirmSecret(secret);
-      checkoutConfirmSecretController.clear();
       showToast('Checkout confirm secret saved');
     } catch (_) {
       showToast('Could not save checkout confirm secret');
@@ -313,8 +347,10 @@ class DemoController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void toggleConfirmAuto() {
-    confirmAutoOn = !confirmAutoOn;
-    notifyListeners();
+    confirmAutoOn = true;
+    showToast(
+      'Auto-confirm is always on. Incoming credits are matched without a tap.',
+    );
   }
 
   void toggleSound() {

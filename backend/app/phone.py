@@ -1,4 +1,6 @@
-"""Indian mobile numbers for enqueue. Matcher does not import this until last-4 is proven."""
+"""Indian mobile numbers for enqueue. Matcher uses the last four digits of
+the already-normalised 10-digit value; it does not import this module.
+"""
 
 from __future__ import annotations
 

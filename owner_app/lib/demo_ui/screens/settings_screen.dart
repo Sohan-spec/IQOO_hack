@@ -101,15 +101,23 @@ class SettingsScreen extends StatelessWidget {
                       const SizedBox(height: 10),
                       TextField(
                         controller: controller.relaySecretController,
-                        obscureText: true,
+                        obscureText: !controller.relaySecretVisible,
                         autocorrect: false,
                         enableSuggestions: false,
                         style: RText.searchInput,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'RELAY_SECRET',
                           hintStyle: RText.miSub,
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              controller.relaySecretVisible
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: controller.toggleRelaySecretVisible,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -140,15 +148,23 @@ class SettingsScreen extends StatelessWidget {
                       const SizedBox(height: 10),
                       TextField(
                         controller: controller.checkoutConfirmSecretController,
-                        obscureText: true,
+                        obscureText: !controller.confirmSecretVisible,
                         autocorrect: false,
                         enableSuggestions: false,
                         style: RText.searchInput,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'CHECKOUT_CONFIRM_SECRET',
                           hintStyle: RText.miSub,
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              controller.confirmSecretVisible
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: controller.toggleConfirmSecretVisible,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -169,6 +185,9 @@ class SettingsScreen extends StatelessWidget {
                   children: [
                     MenuItem(
                       title: 'Confirm payments automatically',
+                      subtitle:
+                          'Always on. Incoming PhonePe credits are matched and confirmed without a tap. This switch cannot turn that off.',
+                      subtitleOk: true,
                       showChevron: false,
                       trailing: PillSwitch(
                         value: controller.confirmAutoOn,

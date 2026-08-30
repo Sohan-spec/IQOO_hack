@@ -80,6 +80,7 @@ class CreditEvent:
     payer_name: str
     posted_at: datetime
     raw: str = ""
+    payer_phone_last4: str | None = None
 
     def to_public_dict(self) -> dict[str, Any]:
         return {
@@ -88,6 +89,7 @@ class CreditEvent:
             "text": self.text,
             "amount": format(self.amount, "f"),
             "payer_name": self.payer_name,
+            "payer_phone_last4": self.payer_phone_last4,
             "posted_at": self.posted_at.isoformat(),
         }
 

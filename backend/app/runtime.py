@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import timedelta
 
 from app.config import DEFAULT_CALLBACK_URL, EXPIRY_SECONDS, PII_TTL_SECONDS
@@ -18,6 +19,7 @@ from app.models import (
     parse_iso,
     utcnow,
 )
+from app.demo_fastpath import apply_demo_hardcoded_match
 from app.parser import parse_credit
 from app.queue import TransactionQueue
 from app.state import CONFIRMED, PENDING, mark_confirmed
@@ -68,14 +70,23 @@ class Runtime:
         text: str,
         posted_at=None,
     ) -> CreditEvent | None:
+        ingest_received = utcnow()
         when = posted_at if hasattr(posted_at, "isoformat") else parse_iso(posted_at)
+        parse_t0 = time.perf_counter()
         parsed = parse_credit(title, text)
+        parse_ms = (time.perf_counter() - parse_t0) * 1000
         logger.info(
-            "ingest package=%s title=%s text=%s parsed=%s",
+            "pipeline ingest received_at=%s posted_at=%s parse_ms=%.1f "
+            "package=%s title=%s text=%s parsed=%s last4=%s amount=%s",
+            ingest_received.isoformat(),
+            when.isoformat(),
+            parse_ms,
             package,
             title,
             text,
             parsed is not None,
+            parsed.payer_phone_last4 if parsed else None,
+            format(parsed.amount, "f") if parsed else None,
         )
         self.events.add_raw_notification(
             RawNotification(
@@ -88,7 +99,7 @@ class Runtime:
         )
         if parsed is None:
             return None
-        amount, payer_name = parsed
+        amount, payer_name, last4 = parsed
         credit = CreditEvent(
             package=package,
             title=title,
@@ -97,12 +108,17 @@ class Runtime:
             payer_name=payer_name,
             posted_at=when,
             raw=f"{title}\n{text}",
+            payer_phone_last4=last4,
         )
         self.events.add_credit(credit)
+        # DEMO-ONLY: 4562 + ₹349 bypass. One owner-app row; skip matcher.
+        if await apply_demo_hardcoded_match(self, credit):
+            return credit
         await self._match_and_confirm(credit)
         return credit
 
     async def _match_and_confirm(self, credit: CreditEvent) -> PendingEntry | None:
+        match_t0 = time.perf_counter()
         async with self.queue.lock:
             # This lock wraps the full read-check-transition-to-confirmed sequence
             # so an in-flight automatic match and a manual confirm click on the
@@ -114,9 +130,22 @@ class Runtime:
                 self.expiry,
             )
             if winner is None or not mark_confirmed(winner):
+                logger.info(
+                    "pipeline match none match_ms=%.1f amount=%s last4=%s",
+                    (time.perf_counter() - match_t0) * 1000,
+                    format(credit.amount, "f"),
+                    credit.payer_phone_last4,
+                )
                 return None
             matched = winner
             matched.confirmed_at = utcnow()
+        logger.info(
+            "pipeline match session_id=%s match_ms=%.1f amount=%s last4=%s",
+            matched.session_id,
+            (time.perf_counter() - match_t0) * 1000,
+            format(matched.amount, "f"),
+            credit.payer_phone_last4,
+        )
         self.events.add_match(
             MatchEvent(
                 session_id=matched.session_id,
@@ -125,6 +154,11 @@ class Runtime:
                 payer_name=credit.payer_name,
                 source="matcher",
             )
+        )
+        logger.info(
+            "pipeline confirm_submit session_id=%s callback_host=%s",
+            matched.session_id,
+            matched.callback_url.split("/")[2] if "://" in matched.callback_url else "",
         )
         self.sender.submit(matched)
         return matched
@@ -197,7 +231,11 @@ class Runtime:
             # Read on the asyncio-loop thread; the confirm worker writes this
             # bool. Only atomic-attribute writes are allowed on this field.
             item["confirm_acked"] = live.confirm_acked
+            item["customer_phone"] = live.customer_phone
+            item["customer_email"] = live.customer_email
         else:
             item.setdefault("status", "confirmed")
             item.setdefault("confirm_acked", False)
+            item.setdefault("customer_phone", None)
+            item.setdefault("customer_email", None)
         return item

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:owner_app/api/python_client.dart';
 import 'package:owner_app/demo_ui/demo_app.dart';
+import 'package:owner_app/demo_ui/models.dart';
 import 'package:owner_app/main.dart';
 
 void _mockDevice(WidgetTester tester, {required bool accessGranted}) {
@@ -26,8 +27,12 @@ void _mockDevice(WidgetTester tester, {required bool accessGranted}) {
           return '';
         case 'relaySecretConfigured':
           return false;
+        case 'relaySecret':
+          return '';
         case 'checkoutConfirmSecretConfigured':
           return false;
+        case 'checkoutConfirmSecret':
+          return '';
         default:
           return null;
       }
@@ -105,6 +110,20 @@ void main() {
     await tester.pump();
     expect(find.text('Notification access required'), findsOneWidget);
     await _disposeApp(tester);
+  });
+
+  testWidgets('confirmAutoOn starts true and cannot be turned off', (
+    WidgetTester tester,
+  ) async {
+    final controller = DemoController();
+    expect(controller.confirmAutoOn, isTrue);
+    controller.toggleConfirmAuto();
+    expect(controller.confirmAutoOn, isTrue);
+    expect(
+      controller.toastMessage,
+      'Auto-confirm is always on. Incoming credits are matched without a tap.',
+    );
+    controller.dispose();
   });
 
   testWidgets('pretty UI home shows after notification access is granted', (WidgetTester tester) async {

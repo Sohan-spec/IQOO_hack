@@ -4,7 +4,11 @@ import modal
 
 image = (
     modal.Image.debian_slim(python_version="3.13")
-    .pip_install("fastapi==0.115.12", "uvicorn[standard]==0.34.2")
+    .pip_install(
+        "fastapi==0.115.12",
+        "uvicorn[standard]==0.34.2",
+        "segno==1.6.6",
+    )
     .add_local_python_source("app")
     .add_local_file("index.html", "/root/index.html")
 )

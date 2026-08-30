@@ -138,6 +138,7 @@ def start(runtime: Runtime | None = None) -> None:
     global _runtime, _loop, _http, _running
     if _http is not None:
         return
+    logging.basicConfig(level=logging.INFO)
     _running = True
     _runtime = runtime or Runtime()
     _loop = asyncio.new_event_loop()
@@ -166,4 +167,5 @@ def stop() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     start()

@@ -114,8 +114,22 @@ def create_app(
         if not isinstance(merchant_id, str) or not merchant_id.strip():
             return JSONResponse({"error": "merchant_id is required"}, status_code=400)
         merchant_id = merchant_id.strip()
+        phone_raw = body.get("customer_phone")
+        phone_digits = (
+            "".join(ch for ch in phone_raw if ch.isdigit())
+            if isinstance(phone_raw, str)
+            else ""
+        )
+        logger.info(
+            "enqueue merchant=%s session_id=%s amount=%s phone_last4=%s",
+            merchant_id,
+            body.get("session_id"),
+            body.get("amount"),
+            phone_digits[-4:] if len(phone_digits) >= 4 else None,
+        )
         link = hub.get(merchant_id)
         if link is None:
+            logger.warning("enqueue 503 phone not connected merchant=%s", merchant_id)
             return JSONResponse({"error": "phone not connected"}, status_code=503)
         forwarded = {key: value for key, value in body.items() if key != "merchant_id"}
         correlation_id = new_correlation_id()

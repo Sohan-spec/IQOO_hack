@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 owner_app/build/
 owner_app/.dart_tool/
+owner_app/android/debug-secrets.properties

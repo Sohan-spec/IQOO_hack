@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from app.models import parse_amount
 from app.phone import normalize_in_mobile
 from app.runtime import Runtime
+
+logger = logging.getLogger(__name__)
 
 
 class ApiError(Exception):
@@ -59,6 +63,13 @@ async def enqueue(runtime: Runtime, body: dict) -> tuple[int, dict]:
         callback_url,
         customer_phone=customer_phone,
         customer_email=customer_email,
+    )
+    logger.info(
+        "enqueue session_id=%s amount=%s phone_last4=%s outcome=%s",
+        entry.session_id,
+        format(entry.amount, "f"),
+        (customer_phone[-4:] if customer_phone else None),
+        outcome,
     )
     public = {
         "session_id": entry.session_id,

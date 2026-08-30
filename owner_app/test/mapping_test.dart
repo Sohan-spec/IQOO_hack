@@ -72,6 +72,7 @@ void main() {
           'customer_name': 'Karan Mehta',
           'amount': '150.50',
           'matched_at': todayIso,
+          'customer_phone': '9108234562',
         },
       ],
       'recent_credits': <Object>[],
@@ -92,6 +93,7 @@ void main() {
     expect(payments[0].ref, 'pending-only');
     expect(payments[1].status, PayStatus.successful);
     expect(payments[2].amount, 150.5);
+    expect(payments[2].phone, '9108234562');
     expect(payments[2].ref, 'opqrstuvwxyz');
     expect(money(payments[2].amount), '₹150.50');
   });
@@ -128,5 +130,31 @@ void main() {
     final totals = todayTotals(snap);
     expect(totals.count, 2);
     expect(totals.total, 120.5);
+  });
+
+  test('todayTotals de-duplicates the same session_id', () {
+    final now = DateTime.now();
+    final todayIso = DateTime(now.year, now.month, now.day, 11).toUtc().toIso8601String();
+    final snap = Snapshot.fromJson({
+      'pending': <Object>[],
+      'recent_matches': [
+        {
+          'session_id': 'demo-4562-349',
+          'customer_name': 'SOHAN REDDY P',
+          'amount': '349.00',
+          'matched_at': todayIso,
+        },
+        {
+          'session_id': 'demo-4562-349',
+          'customer_name': 'SOHAN REDDY P',
+          'amount': '349.00',
+          'matched_at': todayIso,
+        },
+      ],
+      'recent_credits': <Object>[],
+    });
+    final totals = todayTotals(snap);
+    expect(totals.count, 1);
+    expect(totals.total, 349);
   });
 }

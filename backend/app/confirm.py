@@ -56,11 +56,22 @@ def post_json_blocking(url: str, payload: dict[str, Any]) -> bool:
 
 
 def _post_json_with_reason(url: str, payload: dict[str, Any]) -> tuple[bool, str]:
+    session_id = payload.get("session_id")
     if not is_callback_url(url):
+        logger.warning(
+            "pipeline confirm_skip session_id=%s reason=invalid_url",
+            session_id,
+        )
         return False, "invalid_url"
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     secret = confirm_secret()
+    if not secret:
+        logger.warning(
+            "pipeline confirm_post session_id=%s without CHECKOUT_CONFIRM_SECRET "
+            "(checkout will 401)",
+            session_id,
+        )
     if secret:
         headers["Authorization"] = f"Bearer {secret}"
     request = urllib.request.Request(
@@ -69,20 +80,60 @@ def _post_json_with_reason(url: str, payload: dict[str, Any]) -> tuple[bool, str
         method="POST",
         headers=headers,
     )
+    sent_at = time.monotonic()
+    logger.info(
+        "pipeline confirm_post session_id=%s has_bearer=%s",
+        session_id,
+        bool(secret),
+    )
     try:
         # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected -- reason: C5 POSTs to merchant callback_url; scheme is http/https via urlsplit and this opener has no FileHandler or redirect handler
         with _OPENER.open(request, timeout=5) as response:
             status = getattr(response, "status", 200)
+            elapsed_ms = (time.monotonic() - sent_at) * 1000
             if 200 <= status < 300:
+                logger.info(
+                    "pipeline confirm_response session_id=%s status=%s elapsed_ms=%.0f",
+                    session_id,
+                    status,
+                    elapsed_ms,
+                )
                 return True, "ok"
+            logger.warning(
+                "pipeline confirm_response session_id=%s status=%s elapsed_ms=%.0f",
+                session_id,
+                status,
+                elapsed_ms,
+            )
             return False, f"non-2xx HTTP {status}"
     except TimeoutError as exc:
+        logger.warning(
+            "pipeline confirm_response session_id=%s reason=timeout elapsed_ms=%.0f",
+            session_id,
+            (time.monotonic() - sent_at) * 1000,
+        )
         return False, f"timeout: {exc}"
     except urllib.error.HTTPError as exc:
+        logger.warning(
+            "pipeline confirm_response session_id=%s status=%s elapsed_ms=%.0f",
+            session_id,
+            exc.code,
+            (time.monotonic() - sent_at) * 1000,
+        )
         return False, f"non-2xx HTTP {exc.code}"
     except urllib.error.URLError as exc:
+        logger.warning(
+            "pipeline confirm_response session_id=%s reason=URLError elapsed_ms=%.0f",
+            session_id,
+            (time.monotonic() - sent_at) * 1000,
+        )
         return False, f"URLError: {exc.reason}"
     except OSError as exc:
+        logger.warning(
+            "pipeline confirm_response session_id=%s reason=OSError elapsed_ms=%.0f",
+            session_id,
+            (time.monotonic() - sent_at) * 1000,
+        )
         return False, f"OSError: {exc}"
 
 
@@ -144,6 +195,7 @@ class ConfirmationSender:
                 # Written on the confirm worker thread; snapshot() reads this
                 # on the asyncio loop. Keep this an atomic attribute write.
                 entry.confirm_acked = True
+                logger.info("pipeline confirm_acked session_id=%s", entry.session_id)
                 return True
             last_reason = reason
         logger.warning(

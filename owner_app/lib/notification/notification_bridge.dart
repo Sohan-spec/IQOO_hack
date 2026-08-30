@@ -61,6 +61,11 @@ class DeviceBridge {
     return value ?? false;
   }
 
+  Future<String> relaySecret() async {
+    final value = await _channel.invokeMethod<String>('relaySecret');
+    return value ?? '';
+  }
+
   Future<void> setRelaySecret(String secret) {
     return _channel.invokeMethod<void>(
       'setRelaySecret',
@@ -73,6 +78,11 @@ class DeviceBridge {
       'checkoutConfirmSecretConfigured',
     );
     return value ?? false;
+  }
+
+  Future<String> checkoutConfirmSecret() async {
+    final value = await _channel.invokeMethod<String>('checkoutConfirmSecret');
+    return value ?? '';
   }
 
   Future<void> setCheckoutConfirmSecret(String secret) {

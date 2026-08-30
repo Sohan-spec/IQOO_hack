@@ -55,6 +55,8 @@ class MainActivity : FlutterActivity() {
                         result.success(RelayIngress.merchantId)
                     "relaySecretConfigured" ->
                         result.success(RelayIngress.secretConfigured)
+                    "relaySecret" ->
+                        result.success(DeviceIdentityStore(this).hmacSecret())
                     "setRelaySecret" -> {
                         val secret = call.argument<String>("secret") ?: ""
                         DeviceIdentityStore(this).saveHmacSecret(secret)
@@ -63,6 +65,8 @@ class MainActivity : FlutterActivity() {
                     }
                     "checkoutConfirmSecretConfigured" ->
                         result.success(DeviceIdentityStore(this).confirmSecretConfigured())
+                    "checkoutConfirmSecret" ->
+                        result.success(DeviceIdentityStore(this).confirmSecret())
                     "setCheckoutConfirmSecret" -> {
                         val secret = call.argument<String>("secret") ?: ""
                         ConfirmSecrets.apply(this, secret)

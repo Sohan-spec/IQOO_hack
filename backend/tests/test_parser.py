@@ -14,8 +14,25 @@ def test_fixtures_parse_as_expected() -> None:
         parsed = parse_credit(row["title"], row["text"])
         if row["expect_credit"]:
             assert parsed is not None, row["id"]
-            amount, name = parsed
-            assert format(amount, "f") == row["amount"], row["id"]
-            assert name == row["name"], row["id"]
+            assert format(parsed.amount, "f") == row["amount"], row["id"]
+            assert parsed.payer_name == row["name"], row["id"]
+            assert parsed.payer_phone_last4 == row.get("last4"), row["id"]
         else:
             assert parsed is None, row["id"]
+
+
+def test_last4_comes_from_title_not_body() -> None:
+    parsed = parse_credit(
+        "PhonePe · ******4562 · Now",
+        "sent ₹1 to you. ignore ******9999 in body",
+    )
+    assert parsed is not None
+    assert parsed.payer_phone_last4 == "4562"
+    assert format(parsed.amount, "f") == "1.00"
+    assert parsed.payer_name == ""
+
+
+def test_missing_title_last4_is_none() -> None:
+    parsed = parse_credit("Payment received", "You have received ₹1.00 from A")
+    assert parsed is not None
+    assert parsed.payer_phone_last4 is None

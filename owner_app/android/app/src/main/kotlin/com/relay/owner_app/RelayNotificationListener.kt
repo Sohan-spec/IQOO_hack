@@ -15,22 +15,29 @@ class RelayNotificationListener : NotificationListenerService() {
         val extras = sbn.notification.extras
         val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        val sub = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
+        val titleBig = extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString() ?: ""
+        val convo = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString() ?: ""
+        val osPostedAt = Instant.ofEpochMilli(sbn.postTime).toString()
         // Unmodified title/body for every package so GPay/bank can be captured from logcat.
-        Log.i(RAW_TAG, "package=${sbn.packageName} title=$title text=$text")
+        Log.i(
+            RAW_TAG,
+            "package=${sbn.packageName} title=$title text=$text sub=$sub titleBig=$titleBig convo=$convo postTime=$osPostedAt",
+        )
         if (sbn.packageName != PHONEPE) {
             return
         }
         Thread {
-            postNotification(sbn.packageName, title, text)
+            postNotification(sbn.packageName, title, text, osPostedAt)
         }.start()
     }
 
-    private fun postNotification(packageName: String, title: String, text: String) {
+    private fun postNotification(packageName: String, title: String, text: String, postedAt: String) {
         val payload = JSONObject()
             .put("package", packageName)
             .put("title", title)
             .put("text", text)
-            .put("posted_at", Instant.now().toString())
+            .put("posted_at", postedAt)
             .toString()
         repeat(5) { attempt ->
             var connection: HttpURLConnection? = null

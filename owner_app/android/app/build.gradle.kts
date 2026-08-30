@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -18,8 +20,8 @@ android {
         applicationId = "com.relay.owner_app"
         minSdk = maxOf(24, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
-        versionCode = 11
-        versionName = "1.0.10"
+        versionCode = 16
+        versionName = "1.0.15-demo"
         ndk {
             abiFilters.clear()
             abiFilters += listOf("arm64-v8a")
@@ -29,8 +31,9 @@ android {
             "RELAY_WS_URL",
             "\"${project.findProperty("RELAY_WS_URL") ?: "wss://sohan-spec--relay.modal.run/connect"}\"",
         )
-        // RELAY_SECRET and CHECKOUT_CONFIRM_SECRET are not baked into the APK.
-        // Paste them on the Settings screen; they are stored with Keystore-backed DataStore.
+        // RELAY_SECRET and CHECKOUT_CONFIRM_SECRET are never baked into release
+        // APKs. Debug APKs may seed an empty Keystore store from
+        // android/debug-secrets.properties (gitignored).
     }
 
     buildFeatures {
@@ -38,6 +41,19 @@ android {
     }
 
     buildTypes {
+        debug {
+            val secretsFile = rootProject.file("debug-secrets.properties")
+            val secrets = Properties()
+            if (secretsFile.exists()) {
+                secretsFile.inputStream().use { secrets.load(it) }
+            }
+            fun debugSecret(key: String): String {
+                val raw = secrets.getProperty(key, "")?.trim().orEmpty()
+                return raw.replace("\\", "\\\\").replace("\"", "\\\"")
+            }
+            buildConfigField("String", "DEBUG_RELAY_SECRET", "\"${debugSecret("RELAY_SECRET")}\"")
+            buildConfigField("String", "DEBUG_CONFIRM_SECRET", "\"${debugSecret("CHECKOUT_CONFIRM_SECRET")}\"")
+        }
         release {
             signingConfig = signingConfigs.getByName("debug")
         }
